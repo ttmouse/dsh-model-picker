@@ -95,7 +95,15 @@ const snapshot = {
   current: { provider: 'deepseek', model: 'deepseek-reasoner', reasoningEffort: 'high' },
   routable: null, status: 'ready', error: null, failures: [], groups: GROUPS,
 }
-const store = { subscribe: () => () => {}, getSnapshot: () => snapshot }
+// A real store. The component reads it through useSyncExternalStore, so a fake
+// that never notifies would freeze the trigger on its first selection and hide
+// whatever the trigger reports after a pick.
+const listeners = new Set()
+const store = {
+  subscribe(fn) { listeners.add(fn); return () => { listeners.delete(fn) } },
+  getSnapshot: () => snapshot,
+}
+const notify = () => { for (const fn of [...listeners]) fn() }
 const registrations = []
 const slots = {
   inject(_name, fn) { fn() },
@@ -120,7 +128,16 @@ const directory = {
     return {
       store,
       load: () => Promise.resolve(),
-      select: (selection) => { selections.push(selection); return Promise.resolve() },
+      select: (selection) => {
+        selections.push(selection)
+        snapshot.current = {
+          provider: selection.provider,
+          model: selection.model,
+          reasoningEffort: selection.reasoningEffort,
+        }
+        notify()
+        return Promise.resolve()
+      },
     }
   },
 }
@@ -165,6 +182,16 @@ const right = container.querySelector('.dsh-mp2-triggerRight')
 console.log('left  zone :', left?.textContent)
 console.log('right zone :', right?.textContent)
 if (left === null || right === null) throw new Error('two-zone trigger missing')
+
+// Hovering the selector must name the supplier as well as the model: one model
+// id is served by several providers, so the name alone does not say where it runs.
+console.log('left  tip  :', left.title)
+if (left.title !== 'DeepSeek · DeepSeek Reasoner') {
+  throw new Error(`the trigger tooltip must read "provider · model", got "${left.title}"`)
+}
+if (left.getAttribute('aria-label') !== left.title) {
+  throw new Error('the trigger tooltip and its accessible name must agree')
+}
 
 // Every icon must be an SVG, never a text emoji or symbol character — in the
 // trigger and in both popups.
@@ -357,6 +384,14 @@ const submitted = selections.at(-1)
 console.log('submitted  :', JSON.stringify(submitted))
 if (submitted?.provider !== 'deepseek-vision') {
   throw new Error(`a folded pick must submit its own route, submitted "${submitted?.provider}"`)
+}
+
+// The pick closed the popup, so the trigger now describes the new selection —
+// and it must name the *display* supplier, not the folded route's own name.
+const tipAfterVision = container.querySelector('.dsh-mp2-triggerLeft').title
+console.log('tip after vision pick:', tipAfterVision)
+if (tipAfterVision !== 'DeepSeek · DeepSeek Reasoner (modlens vision)') {
+  throw new Error(`a folded route must name its base supplier, got "${tipAfterVision}"`)
 }
 
 // 8. The elevator: with no query, a supplier row is a floor, not a filter —

@@ -15,6 +15,12 @@ selection into separate popups:
 | **Left** (model name) | Opens the model picker | Search box at top (auto-focused), provider column on the left, model list on the right |
 | **Right** (effort) | Opens the effort picker | List of available reasoning-effort levels |
 
+Hovering a zone names what it will act on. The model zone reads
+`provider · model`: one model id is routinely served by several providers, so
+the name alone does not say where the model runs. The supplier named is the
+**display** one, so a selection on a folded `(modlens vision)` route still reads
+as its base provider — the same name the user clicked in the column.
+
 ## Provider folding
 
 A provider whose name is another provider's name plus a trailing parenthesized
