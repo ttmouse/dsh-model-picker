@@ -373,6 +373,26 @@ if (modelNames().length === 0) throw new Error('search showed nothing')
 await act(async () => { typeInto(search, '') })
 console.log('left column       :', providerNames())
 
+// Every supplier wears its chip in the elevator too.
+const elevatorChips = [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp2-provider')].map((btn) => {
+  const chip = btn.querySelector('.dsh-mp2-avatar')
+  const name = btn.querySelector('.dsh-mp2-providerName')?.textContent
+  return { name, chipText: chip?.textContent ?? null, chipHue: chip?.style.getPropertyValue('--dsh-mp2-hue') ?? null }
+})
+console.log('elevator chips    :', JSON.stringify(elevatorChips))
+for (const { name, chipText } of elevatorChips) {
+  // The Favorites floor is not a supplier.
+  if (name?.startsWith('Favorites')) continue
+  if (chipText === null) throw new Error(`supplier "${name}" is missing its chip in the elevator`)
+  if (chipText.length === 0) throw new Error(`supplier "${name}" has an empty chip`)
+}
+// The Favorites floor is not a supplier — it must not wear a chip.
+const favBtn = [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp2-provider')].find(
+  (btn) => btn.querySelector('.dsh-mp2-providerName')?.textContent?.startsWith('Favorites'))
+if (favBtn?.querySelector('.dsh-mp2-avatar') !== null) {
+  throw new Error('the Favorites floor must not wear a supplier chip')
+}
+
 // 3. Search a provider NAME: provider column must narrow too
 await act(async () => { typeInto(search, '智谱') })
 console.log('--- after typing 智谱 ---')
