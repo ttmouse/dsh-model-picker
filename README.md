@@ -23,6 +23,20 @@ the name alone does not say where the model runs. The supplier named is the
 **display** one, so a selection on a folded `(modlens vision)` route still reads
 as its base provider — the same name the user clicked in the column.
 
+## Supplier chip
+
+Every row wears its supplier's leading character ahead of the model name — `D`
+for DeepSeek, `智` for 智谱 GLM — so a model's source is legible without reading
+the group heading back up the list.
+
+- The chip names the **display** supplier, so a row served by a folded
+  `(modlens vision)` route wears its base provider's chip rather than one of its
+  own.
+- Each supplier also gets a fixed tint derived from its route id. Without it
+  `17an-db`, `17an-anbot` and `17an-mumiao` would all show a bare `1` and read as
+  one supplier. Only the background carries the hue, so the glyph itself stays
+  legible in either theme.
+
 ## Provider folding
 
 A provider whose name is another provider's name plus a trailing parenthesized

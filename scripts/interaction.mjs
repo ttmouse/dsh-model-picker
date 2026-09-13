@@ -243,6 +243,33 @@ if (!grouped[1].models.includes('DeepSeek Reasoner (modlens vision)')) {
 }
 if (grouped[2].models.join() !== 'GLM-4.6') throw new Error('a group listed another provider\'s models')
 
+// 2c. Every row wears its supplier's leading character ahead of the model name,
+// so the source is legible without reading the group heading back up the list.
+const avatarEl = (name) => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-option')]
+  .find((o) => o.querySelector('.dsh-mp2-modelName')?.textContent === name)
+  ?.querySelector('.dsh-mp2-avatar')
+const avatarOf = (name) => avatarEl(name)?.textContent
+const hueOf = (name) => avatarEl(name)?.style.getPropertyValue('--dsh-mp2-hue')
+console.log('avatars           :', JSON.stringify({
+  DeepSeek: avatarOf('DeepSeek Chat'),
+  GLM: avatarOf('GLM-4.6'),
+  qwen: avatarOf('Qwen3 Max'),
+  folded: avatarOf('DeepSeek Reasoner (modlens vision)'),
+}))
+if (avatarOf('DeepSeek Chat') !== 'D') throw new Error(`latin initial wrong: ${avatarOf('DeepSeek Chat')}`)
+if (avatarOf('GLM-4.6') !== '智') throw new Error(`CJK initial wrong: ${avatarOf('GLM-4.6')}`)
+if (avatarOf('Qwen3 Max') !== '一') throw new Error(`CJK initial wrong: ${avatarOf('Qwen3 Max')}`)
+// A folded route has no row of its own, so its models must wear the base
+// supplier's chip — same hue, not a colour of their own.
+if (hueOf('DeepSeek Reasoner (modlens vision)') !== hueOf('DeepSeek Chat')) {
+  throw new Error('a folded route wore its own chip instead of its base supplier\'s')
+}
+// Suppliers are told apart by tint, so no two of them may share a hue.
+const supplierHues = [hueOf('DeepSeek Chat'), hueOf('GLM-4.6'), hueOf('Qwen3 Max')]
+if (new Set(supplierHues).size !== supplierHues.length) {
+  throw new Error(`suppliers share a chip colour: ${JSON.stringify(supplierHues)}`)
+}
+
 // 2c. Host facts: the context chip and the image glyph must render on the
 // rows the fact route describes, and nowhere else. Native and bridged vision
 // are different capabilities, so they must not look alike.
