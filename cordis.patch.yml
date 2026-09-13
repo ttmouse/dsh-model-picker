@@ -1,0 +1,6 @@
+# dsh-model-picker bundle patch: mounts the enhanced model picker over the
+# composer's model seat in the dsh web GUI.
+
+- insert:
+    - id: dsh-model-picker
+      name: 'dsh-model-picker'

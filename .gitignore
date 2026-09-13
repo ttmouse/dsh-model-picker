@@ -1,0 +1,5 @@
+node_modules/
+
+# Probe byproducts. `screenshot.png` is the README image and is tracked;
+# everything else these scripts drop is regenerated on demand.
+live-*.png
