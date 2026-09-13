@@ -1,9 +1,11 @@
+![The model picker, with two models favourited](screenshot.png)
+
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 # dsh-model-picker
 
 Enhanced model picker for the dsh web GUI — replaces the composer's model seat
 (`conversation.input.model`).
-
-![The model picker, with two models favourited](screenshot.png)
 
 ## Design
 
@@ -52,8 +54,8 @@ GET /api/model-picker/models
 - One row per provider/model is isolated: a provider or model that throws is
   dropped, and a row carrying neither fact is omitted entirely.
 - The snapshot is cached for 30s — the route never fans out per keystroke.
-- The popup badges each row with a context chip (`1M`, `384K`), an image
-  glyph, and a reasoning sparkle, joined on `provider/modelId`.
+- The popup badges each row with a context chip (`1M`, `384K`) and an image
+  glyph, joined on `provider/modelId`.
 - **Vision.** A full-strength glyph means the model reads pixels itself. A
   dimmed glyph means the route accepts images only because modlens bridges
   them: the model still cannot see — modlens transcribes the image to text
@@ -64,18 +66,12 @@ GET /api/model-picker/models
   with no suffix can therefore be natively vision-capable; the glyph, not the
   name, is the answer. With modlens disabled the folding and the bridge glyph
   are simply dormant — nothing is suffixed.
-- **Reasoning.** The sparkle marks a model that exposes reasoning-effort
-  levels, read from `model.reasoning` in the catalog rather than from the fact
-  route. It is therefore the *same object* the effort popup lists, so a
-  sparkled row always has a working effort zone on the right of the trigger.
-  Hovering names the levels.
 - Before the host half has been restarted the route 404s, so the context chip
-  and native-vision glyph are missing until then; the sparkle does not depend
-  on it.
+  and native-vision glyph are missing until then.
 
 ## Grouped list (elevator)
 
-The right column is always one grouped list: **收藏** (the starred models, a mirrored copy at the top), then every provider's group. The left column is a table of contents to this list.
+The right column is always one grouped list: **Favorites** (`收藏` in a Chinese UI — the starred models, a mirrored copy at the top), then every provider's group. The left column is a table of contents to this list.
 
 - Scrolling the right column highlights the left row for the section pinned at the list's top edge (scroll spy / elevator). The group headers are `position: sticky`, so the left row always matches the header you see.
 - Clicking a left-column supplier scrolls the list to that group. During a search, clicking a supplier **narrows** the results instead (search facet).
@@ -84,7 +80,7 @@ The right column is always one grouped list: **收藏** (the starred models, a m
 
 Every model row carries a `☆` / `★` toggle between the name and the fact strip. The row is itself a `<button>`, so the star stops its click from reaching it — favoriting a model must never also pick it — and it handles `Enter` / `Space` on its own.
 
-- Favorited models appear **twice** in the list: once in their provider's group, and once in the 「收藏」 group pinned at the top of the list. A favorites row always names the provider serving it.
+- Favorited models appear **twice** in the list: once in their provider's group, and once in the favorites group pinned at the top of the list. A favorites row always names the provider serving it.
 - Favorites are keyed on the **route** (`provider/modelId`), not the bare model id: one model id is routinely served by several configured providers, and favoriting one route says nothing about the others.
 - They live in `localStorage` under `dsh.modelPicker.favorites`, the same place the shipped conversation plugin keeps its own view and width preferences. A storage refusal (private mode, full quota) is swallowed: the in-memory set still tracks the page.
 
@@ -128,9 +124,9 @@ that the panel does not resize while the query narrows, and writes
 `live-model-picker.png`.
 
 `node scripts/screenshot.mjs` regenerates the README image. It stars two models
-from different suppliers first — the 收藏 group is the feature a still image has
-to show, and it is empty on a fresh browser profile — and refuses to write a
-shot whose 收藏 group came out empty. Override the output with `SHOT_OUT`.
+from different suppliers first — the favorites group is the feature a still image
+has to show, and it is empty on a fresh browser profile — and refuses to write a
+shot whose favorites group came out empty. Override the output with `SHOT_OUT`.
 
 ## Slot
 
