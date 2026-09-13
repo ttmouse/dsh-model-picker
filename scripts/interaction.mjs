@@ -193,6 +193,19 @@ if (left.getAttribute('aria-label') !== left.title) {
   throw new Error('the trigger tooltip and its accessible name must agree')
 }
 
+// The supplier chip rides on the closed trigger too, so the source is legible
+// without opening the picker at all.
+const triggerChip = () => {
+  const chip = left.querySelector('.dsh-mp2-avatar')
+  return chip === null ? null : { text: chip.textContent, hue: chip.style.getPropertyValue('--dsh-mp2-hue') }
+}
+console.log('trigger chip:', JSON.stringify(triggerChip()))
+if (triggerChip()?.text !== 'D') throw new Error(`the trigger chip must show the supplier initial, got ${JSON.stringify(triggerChip())}`)
+if (triggerChip()?.hue === '') throw new Error('the trigger chip carries no tint')
+if (left.querySelector('.dsh-mp2-triggerLabel').textContent !== 'DeepSeek Reasoner') {
+  throw new Error('the trigger chip displaced the model name')
+}
+
 // Every icon must be an SVG, never a text emoji or symbol character — in the
 // trigger and in both popups.
 const SYMBOL_GLYPHS = /[★☆✓▾]/
@@ -419,6 +432,11 @@ const tipAfterVision = container.querySelector('.dsh-mp2-triggerLeft').title
 console.log('tip after vision pick:', tipAfterVision)
 if (tipAfterVision !== 'DeepSeek · DeepSeek Reasoner (modlens vision)') {
   throw new Error(`a folded route must name its base supplier, got "${tipAfterVision}"`)
+}
+// …and the trigger chip must follow the same rule: the base supplier's tint,
+// not a colour of the folded route's own.
+if (triggerChip()?.text !== 'D') {
+  throw new Error(`the trigger chip must show the base supplier, got ${JSON.stringify(triggerChip())}`)
 }
 
 // 8. The elevator: with no query, a supplier row is a floor, not a filter —

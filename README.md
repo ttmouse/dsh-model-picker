@@ -25,10 +25,12 @@ as its base provider — the same name the user clicked in the column.
 
 ## Supplier chip
 
-Every row wears its supplier's leading character ahead of the model name — `D`
-for DeepSeek, `智` for 智谱 GLM — so a model's source is legible without reading
-the group heading back up the list.
+The supplier's leading character rides ahead of the model name — `D` for
+DeepSeek, `智` for 智谱 GLM — on the **closed trigger** as well as on every row in
+the list, so a model's source is legible before the picker is ever opened.
 
+- The trigger's `max-width` grows by the chip's footprint (16px + its gap), so
+  wearing the chip costs the model name no characters.
 - The chip names the **display** supplier, so a row served by a folded
   `(modlens vision)` route wears its base provider's chip rather than one of its
   own.
