@@ -90,7 +90,7 @@ GET /api/model-picker/models
 The right column is always one grouped list: **Favorites** (`收藏` in a Chinese UI — the starred models, a mirrored copy at the top), then every provider's group. The left column is a table of contents to this list.
 
 - Scrolling the right column highlights the left row for the section pinned at the list's top edge (scroll spy / elevator). The group headers are `position: sticky`, so the left row always matches the header you see.
-- Clicking a left-column supplier scrolls the list to that group. During a search, clicking a supplier **narrows** the results instead (search facet).
+- Clicking a left-column supplier jumps the list straight to that group — an instant landing, not an animated ride: the elevator is a table of contents, and the time spent travelling is time nobody asked for. During a search, clicking a supplier **narrows** the results instead (search facet).
 
 ## Favorites
 

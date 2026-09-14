@@ -191,7 +191,7 @@ if (seat.trigger) {
   // what makes this safe to run against the user's own session.
   let steps = 0
   let inUse = onOpen
-  while (!inUse.inUse && steps < 40) {
+  while (!inUse.inUse && steps < onOpen.listed + 2) {
     await page.keyboard.press('ArrowDown')
     await page.waitForTimeout(80)
     inUse = await cursor()
@@ -207,6 +207,48 @@ if (seat.trigger) {
       triggerText: document.querySelector('.dsh-mp2-triggerLeft')?.textContent ?? null,
       focusBack: document.activeElement === document.querySelector('.dsh-mp2-triggerLeft'),
     }))))
+  }
+
+  // ── Elevator: a supplier click jumps, it does not ride ───────────────────
+  // Read `scrollTop` in the same turn as the click. An animated scroll would
+  // still be at (or near) its starting offset at that instant; a jump is
+  // already at the target. The panel is left open by the keyboard section
+  // above unless Enter landed on the model in use, so open it only if needed.
+  if (await page.evaluate(() => document.querySelector('.dsh-mp2-menu') === null)) {
+    await page.click('.dsh-mp2-triggerLeft')
+    await page.waitForTimeout(500)
+  }
+  const jump = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.dsh-mp2-providers .dsh-mp2-provider')]
+    const groups = [...document.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')]
+    const list = document.querySelector('.dsh-mp2-list')
+    // The last supplier floor: a long jump, so an animation would be obvious.
+    const row = rows[rows.length - 1]
+    const group = groups[groups.length - 1]
+    const target = group.offsetTop
+    const before = list.scrollTop
+    row.click()
+    return {
+      floor: row.querySelector('.dsh-mp2-providerName')?.textContent ?? null,
+      before,
+      target,
+      // A floor near the end cannot be scrolled to the top edge: the list runs
+      // out of content, so the landing offset is clamped there.
+      expected: Math.min(target, list.scrollHeight - list.clientHeight),
+      immediate: list.scrollTop,
+    }
+  })
+  console.log('--- elevator jump ---')
+  console.log(JSON.stringify(jump))
+  await page.waitForTimeout(500)
+  const settled = await page.evaluate(() => document.querySelector('.dsh-mp2-list').scrollTop)
+  console.log('after 500ms :', settled)
+  if (jump.before === jump.expected) throw new Error('the elevator test picked a floor the list was already on')
+  if (jump.immediate !== jump.expected) {
+    throw new Error(`a supplier click must jump to its group, not animate: expected ${jump.expected}, got ${jump.immediate}`)
+  }
+  if (settled !== jump.expected) {
+    throw new Error(`the list kept moving after the click: settled at ${settled}, expected ${jump.expected}`)
   }
 }
 

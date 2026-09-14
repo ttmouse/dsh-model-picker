@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-picker",
   "description": "Enhanced model picker for the dsh web GUI: search-first model popup + separate reasoning-effort selector, both split on a two-zone trigger button",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "type": "module",
   "main": "lib/host.js",
   "exports": {
