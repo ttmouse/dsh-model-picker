@@ -143,6 +143,71 @@ if (seat.trigger) {
   console.log('--- after typing "deep" ---')
   console.log(JSON.stringify(searched, null, 2))
   await page.screenshot({ path: join(process.cwd(), 'live-popup.png') })
+
+  // ── Keyboard-only operation ──────────────────────────────────────────────
+  // The panel must be usable without the mouse: it opens with the first row
+  // already under the cursor, arrows move it, and Enter commits it.
+  await page.fill('.dsh-mp2-search', '')
+  await page.waitForTimeout(300)
+  const cursor = () => page.evaluate(() => {
+    const row = document.querySelector('.dsh-mp2-list .dsh-mp2-optionActive')
+    const search = document.querySelector('.dsh-mp2-search')
+    const style = row === null ? null : getComputedStyle(row)
+    return {
+      name: row?.querySelector('.dsh-mp2-modelName')?.textContent ?? null,
+      id: row?.id ?? null,
+      inUse: row?.querySelector('.dsh-mp2-check svg') !== null,
+      listed: document.querySelectorAll('.dsh-mp2-list .dsh-mp2-option').length,
+      activeDescendant: search?.getAttribute('aria-activedescendant') ?? null,
+      searchFocused: document.activeElement === search,
+      // The cursor is a background surface and nothing else: no left rail, no
+      // border, no outline. The user rejected an accent bar on the left edge.
+      background: style?.backgroundColor ?? null,
+      decoration: style === null ? null : [style.boxShadow, style.borderLeftWidth, style.outlineStyle].join(' | '),
+    }
+  })
+  console.log('--- keyboard ---')
+  const onOpen = await cursor()
+  console.log('cursor on open :', JSON.stringify(onOpen))
+  // The cursor must be readable without any left-edge decoration: a background
+  // surface marks it, and nothing else does.
+  if (onOpen.background === null || onOpen.background === 'rgba(0, 0, 0, 0)') {
+    throw new Error('the cursor row has no background surface to mark it')
+  }
+  if (onOpen.decoration !== 'none | 0px | none') {
+    throw new Error(`the cursor row carries left-edge decoration: ${onOpen.decoration}`)
+  }
+  await page.keyboard.press('ArrowDown')
+  await page.waitForTimeout(150)
+  const moved = await cursor()
+  console.log('after ArrowDown:', JSON.stringify(moved))
+  await page.keyboard.press('Home')
+  await page.waitForTimeout(150)
+  console.log('after Home     :', JSON.stringify(await cursor()))
+  await page.screenshot({ path: join(process.cwd(), 'live-model-picker-keyboard.png') })
+
+  // Walk the cursor onto the model already in use, then Enter: that closes the
+  // popup and hands focus back without touching the live selection, which is
+  // what makes this safe to run against the user's own session.
+  let steps = 0
+  let inUse = onOpen
+  while (!inUse.inUse && steps < 40) {
+    await page.keyboard.press('ArrowDown')
+    await page.waitForTimeout(80)
+    inUse = await cursor()
+    steps += 1
+  }
+  if (!inUse.inUse) {
+    console.log('the model in use is not in the list; skipped the Enter check')
+  } else {
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(600)
+    console.log('after Enter    :', JSON.stringify(await page.evaluate(() => ({
+      menuClosed: document.querySelector('.dsh-mp2-menu') === null,
+      triggerText: document.querySelector('.dsh-mp2-triggerLeft')?.textContent ?? null,
+      focusBack: document.activeElement === document.querySelector('.dsh-mp2-triggerLeft'),
+    }))))
+  }
 }
 
 await page.screenshot({ path: join(process.cwd(), 'live-composer.png') })

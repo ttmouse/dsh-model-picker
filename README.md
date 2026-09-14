@@ -111,13 +111,36 @@ The query is a facet over **both** columns, not just the model list:
 Model and effort data ride the same per-session `ModelDirectory` as the `/model`
 popup, so a switch in either surface is what the other shows next.
 
+## Keyboard
+
+The picker is search-first, so focus never leaves the search box: the popup is
+drivable end to end without tabbing through rows.
+
+- The popup opens with the **cursor** already on the first row — an empty
+  favorites group is skipped rather than stood on. The cursor is not the current
+  model: the check mark reports what is in use, the cursor reports where the next
+  `Enter` lands.
+- `↑` / `↓` move one row, `PageUp` / `PageDown` ten, `Home` / `End` jump to the
+  ends. The cursor holds at both ends instead of wrapping.
+- `Enter` commits the cursor row and closes the popup, handing focus back to the
+  trigger. Typing a new query puts the cursor back on the first match.
+- The cursor is the hover surface plus a brand rail on the row's left edge, and
+  the list scrolls it into view — `scroll-margin-top` keeps the sticky group
+  header from covering the row it scrolled to.
+- The search box names the cursor row in `aria-activedescendant`, so the
+  position is announced even though DOM focus never moves.
+- Favorites stay reachable: `Tab` to a row's star and press `Enter` / `Space` to
+  toggle it without picking the model.
+
 ## Test
 
 `npm test` runs both halves:
 
 - `scripts/interaction.mjs` drives the browser half in jsdom through its real
   loader entry: opens the model popup, types provider and model names, asserts
-  that both columns filter, that a provider facet keeps the query, and that the
+  that both columns filter, that a provider facet keeps the query, that the
+  popup opens with the keyboard cursor on the first row and walks it with
+  `↑`/`↓`/`PageUp`/`PageDown`/`Home`/`End` until `Enter` commits it, and that the
   fact badges land on the rows the fact route describes. The fake context
   enforces cordis's `without inject` rule, so a missing service declaration
   fails the test instead of the live seat. It also asserts every icon is an

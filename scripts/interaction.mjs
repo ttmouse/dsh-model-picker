@@ -500,4 +500,104 @@ await scrollTo(200)
 console.log('lit at scrollTop 200 :', activeProviderRow())
 if (activeProviderRow() !== 'DeepSeek') throw new Error('the spy switched floors too early')
 
+// 9. Pure keyboard operation. The picker is search-first, so focus stays in the
+//    search box and the cursor is reported through `aria-activedescendant`
+//    instead of by moving DOM focus. The popup is still open from section 8,
+//    with no query and no favorites.
+const searchNow = () => container.querySelector('.dsh-mp2-search')
+const activeEls = () => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-optionActive')]
+const activeName = () => activeEls()[0]?.querySelector('.dsh-mp2-modelName')?.textContent ?? null
+const keyPress = async (k, target) => {
+  await act(async () => {
+    target.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: k, bubbles: true }))
+  })
+}
+const press = (k) => keyPress(k, searchNow())
+
+console.log('--- keyboard ---')
+console.log('focus in search  :', document.activeElement === searchNow())
+if (document.activeElement !== searchNow()) throw new Error('the search box must hold focus while the popup is open')
+console.log('cursor on open   :', activeName())
+if (activeName() !== 'DeepSeek Chat') {
+  throw new Error(`the popup must open with the cursor on the first row, got "${activeName()}"`)
+}
+if (activeEls().length !== 1) throw new Error(`exactly one row may wear the cursor, got ${activeEls().length}`)
+console.log('activedescendant :', searchNow().getAttribute('aria-activedescendant'), '| row id:', activeEls()[0].id)
+if (searchNow().getAttribute('aria-activedescendant') !== activeEls()[0].id) {
+  throw new Error('aria-activedescendant does not name the cursor row')
+}
+
+// ↓/↑ walk one row at a time and hold at both ends.
+await press('ArrowDown')
+await press('ArrowDown')
+console.log('after ↓↓         :', activeName())
+if (activeName() !== 'DeepSeek Reasoner (modlens vision)') throw new Error('ArrowDown did not advance the cursor')
+await press('ArrowUp')
+console.log('after ↑          :', activeName())
+if (activeName() !== 'DeepSeek Reasoner') throw new Error('ArrowUp did not retreat the cursor')
+await press('End')
+console.log('after End        :', activeName())
+if (activeName() !== 'Qwen3 Max') throw new Error('End did not jump to the last row')
+await press('ArrowDown')
+if (activeName() !== 'Qwen3 Max') throw new Error('the cursor ran past the last row')
+await press('Home')
+console.log('after Home       :', activeName())
+if (activeName() !== 'DeepSeek Chat') throw new Error('Home did not jump to the first row')
+await press('ArrowUp')
+if (activeName() !== 'DeepSeek Chat') throw new Error('the cursor ran past the first row')
+await press('PageDown')
+console.log('after PageDown   :', activeName())
+if (activeName() !== 'Qwen3 Max') throw new Error('PageDown did not land on the last row')
+await press('Home')
+// Typing keeps working after arrow navigation: focus never left the input.
+await act(async () => { typeInto(searchNow(), 'reasoner') })
+console.log('cursor on query  :', activeName(), '| query:', searchNow().value)
+if (activeName() !== 'DeepSeek Reasoner') throw new Error('a new result set must put the cursor back on the first match')
+
+// Enter on a row commits the cursor — here the folded modlens route, which must
+// still submit the route that serves it.
+const beforeKeyboardPick = selections.length
+await press('Enter')
+console.log('keyboard pick    :', JSON.stringify(selections.at(-1)))
+if (selections.length !== beforeKeyboardPick + 1) throw new Error('Enter did not pick the cursor row')
+if (selections.at(-1)?.model !== 'deepseek-reasoner') throw new Error('Enter picked the wrong row')
+if (container.querySelector('.dsh-mp2-menu') !== null) throw new Error('a keyboard pick must close the popup')
+console.log('focus restored   :', document.activeElement === container.querySelector('.dsh-mp2-triggerLeft'))
+if (document.activeElement !== container.querySelector('.dsh-mp2-triggerLeft')) {
+  throw new Error('closing the popup must hand focus back to the trigger')
+}
+
+// 9b. Enter on a star toggles the favorite and must not also pick the model:
+//     the star stops the key from reaching the menu's own Enter handler.
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+if (activeName() === null) throw new Error('the popup reopened with no cursor row')
+const selectionsBeforeStarKey = selections.length
+await keyPress('Enter', starOf('DeepSeek Chat'))
+console.log('star by keyboard :', starState('DeepSeek Chat').on, '| picks:', selections.length - selectionsBeforeStarKey)
+if (!starState('DeepSeek Chat').on) throw new Error('Enter on the star did not favorite the row')
+if (selections.length !== selectionsBeforeStarKey) throw new Error('Enter on the star also picked the model')
+
+// 9c. The 收藏 mirror is its own row: only one copy wears the cursor, and
+//     committing it submits the route that really serves the model.
+console.log('cursor after star:', activeName(), '| cursor rows:', activeEls().length)
+if (activeEls().length !== 1) throw new Error('the mirrored favorites row lit up together with its supplier row')
+const pickCount = selections.length
+await press('Enter')
+console.log('mirror pick      :', JSON.stringify(selections.at(-1)))
+if (selections.length !== pickCount + 1) throw new Error('Enter did not commit the cursor row')
+if (selections.at(-1)?.provider !== 'deepseek' || selections.at(-1)?.model !== 'deepseek-chat') {
+  throw new Error(`the favorites mirror must submit its real route, got ${JSON.stringify(selections.at(-1))}`)
+}
+
+// 9d. Escape closes the popup from the keyboard and clears the query.
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+await act(async () => { typeInto(searchNow(), 'qwen') })
+await act(async () => {
+  document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+})
+if (container.querySelector('.dsh-mp2-menu') !== null) throw new Error('Escape did not close the popup')
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('query after Esc  :', JSON.stringify(searchNow().value))
+if (searchNow().value !== '') throw new Error('Escape left the query behind')
+
 console.log('INTERACTION OK')
