@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-picker",
   "description": "Enhanced model picker for the dsh web GUI: search-first model popup + separate reasoning-effort selector, both split on a two-zone trigger button",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "type": "module",
   "main": "lib/host.js",
   "exports": {
@@ -36,7 +36,8 @@
     "url": "https://github.com/ttmouse/dsh-model-picker/issues"
   },
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.1.5-rc.2 <0.3.0-0"
   },
   "scripts": {
     "test": "node scripts/interaction.mjs && node scripts/host-route.mjs"
@@ -52,8 +53,9 @@
   "peerDependencies": {
     "react": "^18.2.0",
     "@deepseek-ai/cordis": "*",
-    "@deepseek-ai/dsh-client-runtime": "*",
-    "@deepseek-ai/dsh-client-ui-slots": "*"
+    "@deepseek-ai/dsh-client-ui-renderer": "*",
+    "@deepseek-ai/dsh-api-session-controller": "*",
+    "@deepseek-ai/dsh-client-ui-model-selection": "*"
   },
   "publishConfig": {
     "access": "public"
