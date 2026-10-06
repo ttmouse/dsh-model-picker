@@ -69,6 +69,32 @@ const source = readFileSync(join(root, 'lib/client.js'), 'utf8')
 eval(source)
 const plugin = captured.exports
 
+// ── Stylesheet ownership ───────────────────────────────────────────────────
+// The client module system re-tags every *untagged* <style> tag in the page with
+// whichever package materializes next (`claimStyles`) and deletes everything a
+// package owns when it reloads or is pruned (`removeOwnedStyles`). A tag
+// inserted from apply() is untagged at that moment, so a foreign package claimed
+// it and its next rebuild took the picker's stylesheet with it — the picker kept
+// rendering, unstyled, until a manual page reload. The tag therefore has to be
+// claimed from the module body, before any other package can see it untagged,
+// and this plugin must never remove it itself.
+const ownedStyle = () => document.getElementById('dsh-model-picker-style')
+console.log('style at load    :', ownedStyle() !== null, '| owner:', ownedStyle()?.dataset.plugin, '| bytes:', ownedStyle()?.textContent.length)
+if (ownedStyle() === null) throw new Error('the module body must inject the stylesheet')
+if (ownedStyle().dataset.plugin !== 'dsh-model-picker') {
+  throw new Error(`the stylesheet must be claimed by this plugin, got ${JSON.stringify(ownedStyle().dataset.plugin)}`)
+}
+// Exactly the selector the module system's claim pass uses for unowned tags.
+if (document.querySelector('style:not([data-plugin])') !== null) {
+  throw new Error('the stylesheet is untagged, so the next materializing package would claim it')
+}
+// A foreign package's reload/prune takes its own tags and nobody else's.
+const foreignStyle = document.createElement('style')
+foreignStyle.dataset.plugin = 'some-other-package'
+document.head.appendChild(foreignStyle)
+for (const el of [...document.querySelectorAll('style[data-plugin="some-other-package"]')]) el.remove()
+if (ownedStyle() === null) throw new Error("a foreign package's reload removed the picker stylesheet")
+
 // ── Fake slot service + model directory ────────────────────────────────────
 const GROUPS = [
   { id: 'deepseek', name: 'DeepSeek', models: [
@@ -157,6 +183,20 @@ const ctx = {
 }
 
 plugin.apply(ctx)
+
+// A reload of THIS package drops the tag before re-importing the module body.
+// The body has to put it back, unchanged, or the picker comes back unstyled.
+const cssBytes = ownedStyle().textContent.length
+for (const el of [...document.querySelectorAll('style[data-plugin="dsh-model-picker"]')]) el.remove()
+if (ownedStyle() !== null) throw new Error('the simulated reload sweep did not remove the tag')
+// eslint-disable-next-line no-eval
+eval(source)
+const reloadedStyle = ownedStyle()
+console.log('style after reload:', reloadedStyle !== null, '| bytes:', reloadedStyle?.textContent.length)
+if (reloadedStyle === null) throw new Error('re-materializing the module must restore the stylesheet')
+if (reloadedStyle.dataset.plugin !== 'dsh-model-picker') throw new Error('the restored stylesheet lost its owner')
+if (reloadedStyle.textContent.length !== cssBytes) throw new Error('the restored stylesheet is not the one that was removed')
+
 const { options, Component } = registrations[0]
 const injected = options.inject('session-1')
 
