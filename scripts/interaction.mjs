@@ -12,7 +12,6 @@ import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..')
-const PROFILE = '/Users/douba/.dsh/profiles/web'
 const HARNESS = '/Users/douba/Projects/deepseek-harness'
 
 const { JSDOM } = createRequire(join(HARNESS, 'index.js'))(
@@ -46,10 +45,15 @@ const FACTS = { ok: true, models: [
 ] }
 globalThis.fetch = async () => ({ ok: true, json: async () => FACTS })
 
-const profileRequire = createRequire(join(PROFILE, 'index.js'))
-const React = profileRequire('react')
-const { createRoot } = profileRequire('react-dom/client')
-const { act } = profileRequire('react')
+// React and react-dom have to be ONE pair: the profile carries React 19 with no
+// react-dom of its own, so `react-dom/client` resolves to the checkout's 18.3.1
+// and 19's `Symbol(react.transitional.element)` is not a child react-dom 18 can
+// reconcile ("Objects are not valid as a React child"). Render with the
+// checkout's matched 18.3.1 pair instead of mixing roots.
+const reactRequire = createRequire(join(HARNESS, 'node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/index.js'))
+const React = reactRequire('react')
+const { createRoot } = reactRequire('react-dom/client')
+const { act } = reactRequire('react')
 
 // ── Load the plugin through its loader entry ───────────────────────────────
 let captured = null
