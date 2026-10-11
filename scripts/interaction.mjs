@@ -99,6 +99,23 @@ document.head.appendChild(foreignStyle)
 for (const el of [...document.querySelectorAll('style[data-plugin="some-other-package"]')]) el.remove()
 if (ownedStyle() === null) throw new Error("a foreign package's reload removed the picker stylesheet")
 
+// ── The search box must not wear a focus ring ──────────────────────────────
+// It holds the caret for the whole life of the popup (the arrow keys drive the
+// list from there), so an accent border would be lit from the moment the panel
+// opens and read as a state the user has to clear. The caret is the cue. jsdom
+// answers no `:focus` through getComputedStyle, so the stylesheet text is the
+// subject here; scripts/verify-live.mjs reads the painted colours in a browser.
+const pickerCss = ownedStyle().textContent
+const searchBase = /\.dsh-mp2-search\{([^}]*)\}/.exec(pickerCss)
+if (searchBase === null || !/border:1px solid var\(--dsw-alias-border-inverted\)/.test(searchBase[1])) {
+  throw new Error('the search box must keep its resting 1px border')
+}
+const searchFocus = /\.dsh-mp2-search:focus\{([^}]*)\}/.exec(pickerCss)
+if (searchFocus !== null && /border/.test(searchFocus[1])) {
+  throw new Error(`the search box restyles its border on focus: ${searchFocus[1]}`)
+}
+console.log('search focus ring:', searchFocus === null ? 'none' : searchFocus[1])
+
 // ── Fake slot service + model directory ────────────────────────────────────
 const GROUPS = [
   { id: 'deepseek', name: 'DeepSeek', models: [
@@ -134,10 +151,24 @@ const store = {
   getSnapshot: () => snapshot,
 }
 const notify = () => { for (const fn of [...listeners]) fn() }
+// The settings modal owns its open/active state, and publishes it through the
+// store handle its `sidebar.settings` seat registers. The picker's footer writes
+// to that handle; recording the writes here makes the hand-off assertable
+// without a settings UI in the page.
+const settingsCalls = []
+const settingsSeat = {
+  store: { create: () => ({ actions: { openSection: (id) => { settingsCalls.push(id) } } }) },
+}
+const shortcutCalls = []
+const seats = {
+  'sidebar.settings': [settingsSeat],
+  'settings.section': [{ options: { id: 'models', label: () => 'Models' } }],
+}
 const registrations = []
 const slots = {
   inject(_name, fn) { fn() },
   register(options, Component) { registrations.push({ options, Component }); return () => {} },
+  entries(name) { return seats[name] ?? [] },
 }
 const sessions = { subagentAddress: () => undefined }
 // cordis rebinds a service proxy's `this.ctx` to the CALLER, so every face of
@@ -171,7 +202,20 @@ const directory = {
     }
   },
 }
-const services = { slots, modelDirectories: directory, sessions, remote: { session: {} } }
+const services = {
+  slots,
+  modelDirectories: directory,
+  sessions,
+  remote: { session: {} },
+  // The settings panel's own command registry, the footer's fallback route when
+  // a carrier's seat carries no store.
+  shortcuts: {
+    registry: {
+      commands: new Map([['settings.open', {}]]),
+      invoke: (id, context) => { shortcutCalls.push({ id, context }) },
+    },
+  },
+}
 const ctx = {
   effect(fn) { const d = fn(); return typeof d === 'function' ? d : () => {} },
   // The plugin claims the seat through ctx.inject(['slots','modelDirectories']);
@@ -180,6 +224,7 @@ const ctx = {
     const scope = {}
     for (const name of declared) scope[name] = services[name]
     for (const name of names) scope[name] = services[name]
+    scope.get = (name) => services[name]
     const d = fn(scope)
     return typeof d === 'function' ? d : () => {}
   },
@@ -241,11 +286,17 @@ if (left.getAttribute('aria-label') !== left.title) {
 // without opening the picker at all.
 const triggerChip = () => {
   const chip = left.querySelector('.dsh-mp2-avatar')
-  return chip === null ? null : { text: chip.textContent, hue: chip.style.getPropertyValue('--dsh-mp2-hue') }
+  return chip === null ? null : { text: chip.textContent, bg: chip.style.getPropertyValue('--dsh-mp2-chip-bg') }
 }
 console.log('trigger chip:', JSON.stringify(triggerChip()))
 if (triggerChip()?.text !== 'D') throw new Error(`the trigger chip must show the supplier initial, got ${JSON.stringify(triggerChip())}`)
-if (triggerChip()?.hue === '') throw new Error('the trigger chip carries no tint')
+// The tint is a curated OKLCH value: fixed chroma and lightness, hue only, so
+// one supplier cannot shout louder than another. It used to be a hash of the
+// route id, which put ten unrelated hues in one panel.
+if (triggerChip()?.bg === '') throw new Error('the trigger chip carries no tint')
+if (!/^oklch\(/.test(triggerChip()?.bg ?? '')) {
+  throw new Error(`the trigger chip tint must be a curated OKLCH value, got ${JSON.stringify(triggerChip()?.bg)}`)
+}
 if (left.querySelector('.dsh-mp2-triggerLabel').textContent !== 'DeepSeek Reasoner') {
   throw new Error('the trigger chip displaced the model name')
 }
@@ -290,15 +341,42 @@ const groupsShown = () => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2
   icon: g.querySelector('.dsh-mp2-groupHeaderIcon svg') !== null,
   models: [...g.querySelectorAll('.dsh-mp2-modelName')].map((n) => n.textContent),
 }))
+/** The group DOM node whose heading reads `header` (icons carry no text). */
+const groupEl = (header) => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')]
+  .find((g) => g.querySelector('.dsh-mp2-groupHeader')?.textContent === header)
 const grouped = groupsShown()
+const groupByHeader = (header) => grouped.find((g) => g.header === header)
+/** The same lookup against the CURRENT list — `grouped` is a snapshot. */
+const liveGroup = (header) => groupsShown().find((g) => g.header === header)
 console.log('groups            :', JSON.stringify(grouped))
-if (grouped.length !== 4) throw new Error(`expected favorites + 3 provider groups, got ${grouped.length}`)
-if (grouped[0].header !== 'Favorites') throw new Error('the first group must be Favorites')
+if (grouped.length !== 5) throw new Error(`expected recent + favorites + 3 provider groups, got ${grouped.length}`)
+if (grouped[0].header !== 'Recent') throw new Error('the history group must be pinned above the favorites')
+if (grouped[1].header !== 'Favorites') throw new Error('the second group must be Favorites')
 if (grouped.some((g) => !g.icon)) throw new Error('a group heading is missing its supplier icon')
-if (!grouped[1].models.includes('DeepSeek Reasoner (modlens vision)')) {
+if (!groupByHeader('DeepSeek')?.models.includes('DeepSeek Reasoner (modlens vision)')) {
   throw new Error('a folded model did not land in its base provider group')
 }
-if (grouped[2].models.join() !== 'GLM-4.6') throw new Error('a group listed another provider\'s models')
+if (groupByHeader('智谱 GLM')?.models.join() !== 'GLM-4.6') throw new Error('a group listed another provider\'s models')
+
+// 2b-bis. History: the panel opens on what this session is already using, so
+// the seat records the directory's own current route — not the rows clicked
+// here — and the group is a mirror like 收藏, naming the route on every row.
+console.log('history group     :', JSON.stringify(groupByHeader('Recent')))
+if (groupByHeader('Recent').models.join() !== 'DeepSeek Reasoner') {
+  throw new Error(`the history must open on the route in use, got ${JSON.stringify(groupByHeader('Recent').models)}`)
+}
+const storedRecent = () => JSON.parse(localStorage.getItem('dsh.modelPicker.recent') ?? 'null')
+if (JSON.stringify(storedRecent()) !== '["deepseek/deepseek-reasoner"]') {
+  throw new Error(`the route in use did not reach localStorage: ${JSON.stringify(storedRecent())}`)
+}
+if (groupEl('Recent').querySelector('.dsh-mp2-option .dsh-mp2-description')?.textContent !== 'DeepSeek · thinking') {
+  throw new Error('a history row must name the route serving it')
+}
+// The heading says "history", not "supplier": it must not wear the building glyph.
+const headerIcon = (header) => groupEl(header)?.querySelector('.dsh-mp2-groupHeaderIcon svg')?.innerHTML
+if (headerIcon('Recent') === headerIcon('DeepSeek')) {
+  throw new Error('the history group wears the supplier heading icon')
+}
 
 // 2c. Every row wears its supplier's leading character ahead of the model name,
 // so the source is legible without reading the group heading back up the list.
@@ -306,7 +384,7 @@ const avatarEl = (name) => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp
   .find((o) => o.querySelector('.dsh-mp2-modelName')?.textContent === name)
   ?.querySelector('.dsh-mp2-avatar')
 const avatarOf = (name) => avatarEl(name)?.textContent
-const hueOf = (name) => avatarEl(name)?.style.getPropertyValue('--dsh-mp2-hue')
+const hueOf = (name) => avatarEl(name)?.style.getPropertyValue('--dsh-mp2-chip-bg')
 console.log('avatars           :', JSON.stringify({
   DeepSeek: avatarOf('DeepSeek Chat'),
   GLM: avatarOf('GLM-4.6'),
@@ -390,22 +468,21 @@ if (JSON.stringify(storedFavorites()) !== '["deepseek/deepseek-chat"]') {
   throw new Error(`favorites did not reach localStorage: ${JSON.stringify(storedFavorites())}`)
 }
 
-// The 收藏 group is the first group in the list and mirrors the starred model,
-// naming the route that serves it. The list keeps every provider — no scope
-// change.
-const favGroup = groupsShown()[0]
-if (favGroup.header !== 'Favorites') throw new Error('favorites group must be first')
+// The 收藏 group mirrors the starred model, naming the route that serves it.
+// The list keeps every provider — no scope change.
+const favGroup = liveGroup('Favorites')
+if (liveGroup('Recent') === undefined) throw new Error('the history group must survive a favorite edit')
 if (JSON.stringify(favGroup.models) !== '["DeepSeek Chat"]') throw new Error('favorites group does not mirror the starred model')
-console.log('favorites group   :', favGroup.models, '| detail:',
-  container.querySelector('.dsh-mp2-group:first-child .dsh-mp2-option .dsh-mp2-description')?.textContent)
-if (container.querySelector('.dsh-mp2-group:first-child .dsh-mp2-option .dsh-mp2-description')?.textContent !== 'DeepSeek · general') {
+const favDetail = () => groupEl('Favorites').querySelector('.dsh-mp2-option .dsh-mp2-description')?.textContent
+console.log('favorites group   :', favGroup.models, '| detail:', favDetail())
+if (favDetail() !== 'DeepSeek · general') {
   throw new Error('a favorites-group row must name its provider')
 }
-if (groupsShown().length !== 4) throw new Error('the favorites scope must not replace the full list')
+if (groupsShown().length !== 5) throw new Error('the favorites scope must not replace the full list')
 
 // Un-starring removes it from the favorites group and updates the badge.
 await act(async () => { starOf('DeepSeek Chat').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-const favGroupAfter = groupsShown()[0]
+const favGroupAfter = liveGroup('Favorites')
 console.log('after un-star     :', favGroupAfter.models, '| favorites badge:', providerCount('Favorites'))
 if (favGroupAfter.models.length !== 0) throw new Error('un-starred model stayed in the favorites group')
 if (providerCount('Favorites') !== '0') throw new Error('favorites badge did not drop the star')
@@ -424,17 +501,26 @@ const elevatorChips = [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp
   return { name, chipText: chip?.textContent ?? null, chipHue: chip?.style.getPropertyValue('--dsh-mp2-hue') ?? null }
 })
 console.log('elevator chips    :', JSON.stringify(elevatorChips))
+// The history and favorites floors are mirrors, not suppliers.
+const MIRROR_FLOORS = ['Recent', 'Favorites']
+const isMirrorFloor = (name) => MIRROR_FLOORS.includes(name)
 for (const { name, chipText } of elevatorChips) {
-  // The Favorites floor is not a supplier.
-  if (name?.startsWith('Favorites')) continue
+  if (isMirrorFloor(name)) continue
   if (chipText === null) throw new Error(`supplier "${name}" is missing its chip in the elevator`)
   if (chipText.length === 0) throw new Error(`supplier "${name}" has an empty chip`)
 }
-// The Favorites floor is not a supplier — it must not wear a chip.
-const favBtn = [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp2-provider')].find(
-  (btn) => btn.querySelector('.dsh-mp2-providerName')?.textContent?.startsWith('Favorites'))
-if (favBtn?.querySelector('.dsh-mp2-avatar') !== null) {
-  throw new Error('the Favorites floor must not wear a supplier chip')
+// A mirror floor is not a supplier — it must not wear a chip, and it counts
+// its own rows. The history floor is the lit one, because its heading is the
+// one pinned at the list's top edge.
+for (const name of MIRROR_FLOORS) {
+  if (providerRow(name) === undefined) throw new Error(`the ${name} floor is missing from the elevator`)
+  if (providerRow(name).querySelector('.dsh-mp2-avatar') !== null) {
+    throw new Error(`the ${name} floor must not wear a supplier chip`)
+  }
+}
+if (providerCount('Recent') !== '1') throw new Error(`the history floor must count its rows, got ${providerCount('Recent')}`)
+if (!providerRow('Recent').classList.contains('dsh-mp2-providerActive')) {
+  throw new Error('the history floor must be the lit one while its heading is pinned at the top')
 }
 
 // 3. Search a provider NAME: provider column must narrow too
@@ -514,16 +600,16 @@ const list = container.querySelector('.dsh-mp2-list')
 if (list === null) throw new Error('model list did not reopen')
 console.log('--- elevator ---')
 console.log('lit before click  :', activeProviderRow(), '| groups:', groupsShown().length)
-if (groupsShown().length !== 4) throw new Error('expected favorites + 3 provider groups')
+if (groupsShown().length !== 5) throw new Error('expected recent + favorites + 3 provider groups')
 
 const zhipuRow = providerRow('智谱 GLM')
 await act(async () => { zhipuRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
 console.log('lit after click   :', activeProviderRow(), '| groups:', groupsShown().length)
 if (activeProviderRow() !== '智谱 GLM') throw new Error('clicking a supplier row did not light it')
-if (groupsShown().length !== 4) throw new Error('clicking a supplier row filtered the list instead of travelling')
+if (groupsShown().length !== 5) throw new Error('clicking a supplier row filtered the list instead of travelling')
 
 // Scrolling the list moves the highlight, with no group removed. Groups are:
-// Favorites (offset 0), DeepSeek (120), 智谱 GLM (240), 一起安 (360).
+// Recent (offset 0), Favorites (120), DeepSeek (240), 智谱 GLM (360), 一起安 (480).
 const groupEls = [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')]
 groupEls.forEach((el, index) => {
   Object.defineProperty(el, 'offsetTop', { value: index * 120, configurable: true })
@@ -534,15 +620,18 @@ const scrollTo = async (top) => {
 }
 await scrollTo(0)
 console.log('lit at scrollTop 0   :', activeProviderRow())
-if (activeProviderRow() !== 'Favorites') throw new Error('the spy did not light the favorites group at the top')
-await scrollTo(360)
-console.log('lit at scrollTop 360 :', activeProviderRow(), '| groups:', groupsShown().length)
+if (activeProviderRow() !== 'Recent') throw new Error('the spy did not light the history group at the top')
+await scrollTo(480)
+console.log('lit at scrollTop 480 :', activeProviderRow(), '| groups:', groupsShown().length)
 if (activeProviderRow() !== '一起安') throw new Error('the spy did not follow the scroll position')
-if (groupsShown().length !== 4) throw new Error('scrolling dropped a group')
+if (groupsShown().length !== 5) throw new Error('scrolling dropped a group')
+await scrollTo(360)
+console.log('lit at scrollTop 360 :', activeProviderRow())
+if (activeProviderRow() !== '智谱 GLM') throw new Error('the spy did not stop on the floor the list is standing on')
 // Mid-group stays on the floor the list is standing on, not the next one.
 await scrollTo(200)
 console.log('lit at scrollTop 200 :', activeProviderRow())
-if (activeProviderRow() !== 'DeepSeek') throw new Error('the spy switched floors too early')
+if (activeProviderRow() !== 'Favorites') throw new Error('the spy switched floors too early')
 
 // 9. Pure keyboard operation. The picker is search-first, so focus stays in the
 //    search box and the cursor is reported through `aria-activedescendant`
@@ -551,6 +640,9 @@ if (activeProviderRow() !== 'DeepSeek') throw new Error('the spy switched floors
 const searchNow = () => container.querySelector('.dsh-mp2-search')
 const activeEls = () => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-optionActive')]
 const activeName = () => activeEls()[0]?.querySelector('.dsh-mp2-modelName')?.textContent ?? null
+/** The group heading above the cursor row — which floor the cursor stands on. */
+const activeGroup = () => activeEls()[0]?.closest('.dsh-mp2-group')
+  ?.querySelector('.dsh-mp2-groupHeader')?.textContent ?? null
 const keyPress = async (k, target) => {
   await act(async () => {
     target.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: k, bubbles: true }))
@@ -561,9 +653,11 @@ const press = (k) => keyPress(k, searchNow())
 console.log('--- keyboard ---')
 console.log('focus in search  :', document.activeElement === searchNow())
 if (document.activeElement !== searchNow()) throw new Error('the search box must hold focus while the popup is open')
-console.log('cursor on open   :', activeName())
-if (activeName() !== 'DeepSeek Chat') {
-  throw new Error(`the popup must open with the cursor on the first row, got "${activeName()}"`)
+console.log('cursor on open   :', activeName(), '| floor:', activeGroup())
+// The cursor opens on the first row of the list, which is the most recent
+// route: re-picking what you last used is `Enter` away from opening the panel.
+if (activeName() !== 'DeepSeek Reasoner (modlens vision)' || activeGroup() !== 'Recent') {
+  throw new Error(`the popup must open on the last used route, got "${activeName()}" on ${activeGroup()}`)
 }
 if (activeEls().length !== 1) throw new Error(`exactly one row may wear the cursor, got ${activeEls().length}`)
 console.log('activedescendant :', searchNow().getAttribute('aria-activedescendant'), '| row id:', activeEls()[0].id)
@@ -571,11 +665,13 @@ if (searchNow().getAttribute('aria-activedescendant') !== activeEls()[0].id) {
   throw new Error('aria-activedescendant does not name the cursor row')
 }
 
-// ↓/↑ walk one row at a time and hold at both ends.
+// ↓/↑ walk one row at a time and hold at both ends. Rows, in order: the two
+// history rows, then DeepSeek's three, then GLM-4.6, then Qwen3 Max (收藏 is
+// empty here, so it contributes no row).
 await press('ArrowDown')
 await press('ArrowDown')
-console.log('after ↓↓         :', activeName())
-if (activeName() !== 'DeepSeek Reasoner (modlens vision)') throw new Error('ArrowDown did not advance the cursor')
+console.log('after ↓↓         :', activeName(), '| floor:', activeGroup())
+if (activeName() !== 'DeepSeek Chat') throw new Error('ArrowDown did not advance the cursor')
 await press('ArrowUp')
 console.log('after ↑          :', activeName())
 if (activeName() !== 'DeepSeek Reasoner') throw new Error('ArrowUp did not retreat the cursor')
@@ -586,9 +682,9 @@ await press('ArrowDown')
 if (activeName() !== 'Qwen3 Max') throw new Error('the cursor ran past the last row')
 await press('Home')
 console.log('after Home       :', activeName())
-if (activeName() !== 'DeepSeek Chat') throw new Error('Home did not jump to the first row')
+if (activeName() !== 'DeepSeek Reasoner (modlens vision)') throw new Error('Home did not jump to the first row')
 await press('ArrowUp')
-if (activeName() !== 'DeepSeek Chat') throw new Error('the cursor ran past the first row')
+if (activeName() !== 'DeepSeek Reasoner (modlens vision)') throw new Error('the cursor ran past the first row')
 await press('PageDown')
 console.log('after PageDown   :', activeName())
 if (activeName() !== 'Qwen3 Max') throw new Error('PageDown did not land on the last row')
@@ -622,8 +718,14 @@ if (!starState('DeepSeek Chat').on) throw new Error('Enter on the star did not f
 if (selections.length !== selectionsBeforeStarKey) throw new Error('Enter on the star also picked the model')
 
 // 9c. The 收藏 mirror is its own row: only one copy wears the cursor, and
-//     committing it submits the route that really serves the model.
+//     committing it submits the route that really serves the model. The mirror
+//     sits below the history group, so walk down onto it.
 console.log('cursor after star:', activeName(), '| cursor rows:', activeEls().length)
+await press('Home')
+for (let step = 0; activeGroup() !== 'Favorites' && step < 10; step += 1) await press('ArrowDown')
+console.log('cursor on mirror :', activeName(), '| floor:', activeGroup())
+if (activeGroup() !== 'Favorites') throw new Error('the cursor never reached the favorites mirror')
+if (activeName() !== 'DeepSeek Chat') throw new Error(`the floor holds the starred model, cursor landed on "${activeName()}"`)
 if (activeEls().length !== 1) throw new Error('the mirrored favorites row lit up together with its supplier row')
 const pickCount = selections.length
 await press('Enter')
@@ -631,6 +733,14 @@ console.log('mirror pick      :', JSON.stringify(selections.at(-1)))
 if (selections.length !== pickCount + 1) throw new Error('Enter did not commit the cursor row')
 if (selections.at(-1)?.provider !== 'deepseek' || selections.at(-1)?.model !== 'deepseek-chat') {
   throw new Error(`the favorites mirror must submit its real route, got ${JSON.stringify(selections.at(-1))}`)
+}
+// The pick re-entered the history at the top, ahead of the routes it displaced.
+console.log('history after pick:', JSON.stringify(storedRecent()))
+if (storedRecent()[0] !== 'deepseek/deepseek-chat') {
+  throw new Error(`a pick must move its route to the front of the history: ${JSON.stringify(storedRecent())}`)
+}
+if (new Set(storedRecent()).size !== storedRecent().length) {
+  throw new Error(`the history kept a duplicate route: ${JSON.stringify(storedRecent())}`)
 }
 
 // 9d. Escape closes the popup from the keyboard and clears the query.
@@ -643,5 +753,230 @@ if (container.querySelector('.dsh-mp2-menu') !== null) throw new Error('Escape d
 await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
 console.log('query after Esc  :', JSON.stringify(searchNow().value))
 if (searchNow().value !== '') throw new Error('Escape left the query behind')
+
+// 10. The history is a fixed-length shortcut, not an archive. Seeding more
+//     routes than the cap and remounting must trim it back to the cap, keep the
+//     route in use at the front, and leave a route that is no longer configured
+//     in storage but out of the rendered group.
+await act(async () => { reactRoot.unmount() })
+localStorage.setItem('dsh.modelPicker.recent', JSON.stringify([
+  'ghost/never-configured',
+  'deepseek/deepseek-reasoner',
+  'zhipu/glm-4.6',
+  '17an/qwen3-max',
+  'deepseek-vision/deepseek-reasoner-vision',
+  'deepseek/deepseek-chat',
+  'zhipu/glm-4.6',
+  'deepseek/deepseek-chat',
+]))
+const remounted = createRoot(container)
+await act(async () => {
+  remounted.render(React.createElement(Component, { locked: false, ...injected, t: (k) => k }))
+})
+const trimmed = storedRecent()
+console.log('--- history cap ---')
+console.log('history trimmed  :', JSON.stringify(trimmed))
+if (trimmed.length !== 6) throw new Error(`the history must be capped, got ${trimmed.length}`)
+if (trimmed[0] !== 'deepseek/deepseek-chat') throw new Error('the route in use must lead the history after a remount')
+if (new Set(trimmed).size !== trimmed.length) throw new Error(`a duplicate route survived the cap: ${JSON.stringify(trimmed)}`)
+
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+const recentAfter = liveGroup('Recent')
+console.log('history group    :', JSON.stringify(recentAfter?.models))
+if (recentAfter === undefined) throw new Error('the history group disappeared from the reopened popup')
+if (recentAfter.models.join() !== 'DeepSeek Chat,DeepSeek Reasoner,GLM-4.6,Qwen3 Max,DeepSeek Reasoner (modlens vision)') {
+  throw new Error(`the history group must list the stored routes in order, got ${JSON.stringify(recentAfter.models)}`)
+}
+if (providerCount('Recent') !== '5') throw new Error(`the history floor must count the rendered rows, got ${providerCount('Recent')}`)
+
+// 10b. A history with nothing to show — every route gone, no route in use —
+//      renders neither the group nor its floor. 收藏 keeps its place: it
+//      teaches that starring exists, the history has nothing to teach.
+await act(async () => { remounted.unmount() })
+snapshot.current = null
+localStorage.setItem('dsh.modelPicker.recent', JSON.stringify(['ghost/never-configured']))
+const third = createRoot(container)
+await act(async () => {
+  third.render(React.createElement(Component, { locked: false, ...injected, t: (k) => k }))
+})
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('--- unusable history ---')
+console.log('history group    :', JSON.stringify(liveGroup('Recent')), '| floors:', providerNames())
+if (liveGroup('Recent') !== undefined) throw new Error('an unusable history must not render a group')
+if (providerRow('Recent') !== undefined) throw new Error('an unusable history must not render an elevator floor')
+if (liveGroup('Favorites') === undefined) throw new Error('the favorites group must survive an unusable history')
+
+// 11. The settings hand-off. The picker can only list what the configured
+//     providers offer; when the official models are missing, the fix lives in
+//     Settings → 模型, and the panel is exactly where that is noticed.
+console.log('--- settings hand-off ---')
+const footerRow = () => container.querySelector('.dsh-mp2-footer')
+const footerAction = () => container.querySelector('.dsh-mp2-footerAction')
+if (container.querySelector('.dsh-mp2-menu') === null) throw new Error('the popup must be open to test its footer')
+const footerNode = footerRow()
+if (footerNode === null) throw new Error('the model popup must carry the settings footer')
+// A fixed row under the body, not a row inside the scroll area: one that scrolls
+// away is one the user cannot find when the models are missing.
+if (footerNode.closest('.dsh-mp2-list') !== null) throw new Error('the footer must sit outside the scrolling list')
+if (footerNode.parentElement.className !== 'dsh-mp2-menu') throw new Error('the footer must be a direct child of the popup')
+assertVectorIcons(footerNode, 'the settings footer')
+const footerButton = footerAction()
+console.log('footer label     :', footerButton.textContent, '| tag:', footerButton.tagName)
+if (footerButton.tagName !== 'BUTTON' || footerButton.type !== 'button') throw new Error('the footer row must be a real button')
+if (!footerButton.textContent.includes('Configure official models')) {
+  throw new Error(`the footer must name what it configures, got ${JSON.stringify(footerButton.textContent)}`)
+}
+if (!footerButton.textContent.includes('Settings · Models')) {
+  throw new Error('the footer must name the surface it leaves for')
+}
+if (footerButton.querySelectorAll('svg').length !== 2) {
+  throw new Error('the footer wears a settings glyph and a leave-the-panel glyph')
+}
+
+// Clicking it writes the 模型 section to the settings shell and closes the
+// popup — and it must never double as a model pick.
+const picksBeforeFooter = selections.length
+await act(async () => { footerButton.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('openSection      :', JSON.stringify(settingsCalls), '| picks:', selections.length - picksBeforeFooter)
+if (settingsCalls.at(-1) !== 'models') throw new Error(`the footer must open the models section, got ${JSON.stringify(settingsCalls)}`)
+if (selections.length !== picksBeforeFooter) throw new Error('the footer click also picked a model')
+if (container.querySelector('.dsh-mp2-menu') !== null) throw new Error('the footer must close the picker after handing off')
+
+// 11b. A carrier whose settings seat carries no store falls back to the panel's
+//      own `settings.open` command, then lights its 模型 row by the label the
+//      ledger publishes — never by a hard-coded string.
+seats['sidebar.settings'] = []
+const navClicks = []
+document.body.insertAdjacentHTML('beforeend',
+  '<div data-shortcut-modal="settings"><nav><button>General</button><button>Models</button></nav></div>')
+for (const row of document.querySelectorAll('[data-shortcut-modal="settings"] nav button')) {
+  row.addEventListener('click', () => { navClicks.push(row.textContent) })
+}
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+await act(async () => { footerAction().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('fallback command :', JSON.stringify(shortcutCalls.map((call) => call.id)), '| nav:', JSON.stringify(navClicks))
+if (shortcutCalls.at(-1)?.id !== 'settings.open') throw new Error("the fallback must run the settings panel's own command")
+if (shortcutCalls.at(-1)?.context?.modal !== null) throw new Error('the fallback must present itself as a page command, not a modal one')
+if (navClicks.at(-1) !== 'Models') throw new Error(`the fallback must light the models row by its ledger label, got ${JSON.stringify(navClicks)}`)
+if (container.querySelector('.dsh-mp2-menu') !== null) throw new Error('the fallback must close the picker too')
+
+// 11c. With neither a store nor the command — a carrier that has no settings
+//      panel at all — the row must do nothing rather than close the picker onto
+//      an empty page.
+seats['sidebar.settings'] = []
+services.shortcuts = { registry: { commands: new Map(), invoke: () => { shortcutCalls.push({ id: 'unexpected' }) } } }
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+await act(async () => { footerAction().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('no settings UI   : popup open =', container.querySelector('.dsh-mp2-menu') !== null)
+if (container.querySelector('.dsh-mp2-menu') === null) throw new Error('a footer that cannot open settings must leave the picker open')
+if (shortcutCalls.at(-1)?.id === 'unexpected') throw new Error('the footer ran a command that is not registered')
+
+// 12. The copy follows the APP's language, not the browser's.
+//     DSH's UI language is a product preference (Settings → General → Language)
+//     that the locale plugin mirrors onto `<html lang>`; a user who picked 中文
+//     in the app must see 中文 here even with an en-US browser, and a switch must
+//     reach an already-open panel without a reload.
+console.log('--- language ---')
+const openPopup = async () => {
+  if (container.querySelector('.dsh-mp2-menu') === null) {
+    await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  }
+}
+const menuCopy = () => ({
+  search: container.querySelector('.dsh-mp2-search')?.placeholder ?? null,
+  footer: container.querySelector('.dsh-mp2-footerLabel')?.textContent ?? null,
+  where: container.querySelector('.dsh-mp2-footerWhere')?.textContent ?? null,
+  panelCaption: container.querySelector('.dsh-mp2-paneCaption')?.textContent ?? null,
+})
+const setLang = async (tag) => {
+  await act(async () => {
+    document.documentElement.lang = tag
+    // jsdom delivers MutationObserver callbacks on a macrotask, not a
+    // microtask, so the switch needs a timer tick before the assertions run.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+}
+// The navigator says en-US (jsdom's default and the browser this test runs in):
+// the browser cannot be what decides.
+console.log('navigator lang   :', navigator.language, '| html lang from the document:', JSON.stringify(document.documentElement.lang))
+if (String(navigator.language).toLowerCase().startsWith('zh')) {
+  throw new Error('this test assumes an English browser, or it proves nothing')
+}
+// 11c left the popup open with the default (English) copy; make it explicit.
+if (container.querySelector('.dsh-mp2-search')?.placeholder === '搜索模型或提供商…') {
+  throw new Error('the default language must be English on an en-US browser')
+}
+await setLang('en')
+const english = menuCopy()
+console.log('html lang en     :', JSON.stringify(english))
+if (english.search !== 'Search model or provider…') throw new Error(`English copy did not follow <html lang="en">: ${english.search}`)
+if (english.footer !== 'Configure official models') throw new Error(`English footer copy wrong: ${english.footer}`)
+
+await setLang('zh-CN')
+const chinese = menuCopy()
+console.log('html lang zh-CN  :', JSON.stringify(chinese))
+if (chinese.search !== '搜索模型或提供商…') {
+  throw new Error(`an open popup must switch to Chinese with the app, got ${JSON.stringify(chinese.search)}`)
+}
+if (chinese.footer !== '配置官方模型') throw new Error(`Chinese footer copy wrong: ${chinese.footer}`)
+if (chinese.where !== '设置 · 模型') throw new Error(`Chinese destination copy wrong: ${chinese.where}`)
+if (chinese.panelCaption !== '全部提供商') throw new Error(`Chinese column caption wrong: ${chinese.panelCaption}`)
+
+// A closed popup reads the attribute when it opens: no observer needed.
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+await setLang('en')
+await openPopup()
+await setLang('zh-CN')
+console.log('reopened in zh   :', JSON.stringify(menuCopy()))
+if (menuCopy().search !== '搜索模型或提供商…') throw new Error('reopening the popup must read the current language')
+
+// 12b. The `locale` service — the preference the user actually picks in
+//      Settings → General → Language — outranks the document attribute, and its
+//      own subscription carries a switch with no attribute change at all. The
+//      shipped shell has both; this proves the panel prefers the real setting.
+await act(async () => { reactRoot.unmount() })
+const localeListeners = new Set()
+let localeActive = 'zh'
+services.locale = {
+  getSnapshot: () => ({ active: localeActive, locales: [], revision: 0 }),
+  subscribe: (fn) => { localeListeners.add(fn); return () => { localeListeners.delete(fn) } },
+}
+document.documentElement.lang = 'en'
+const localeRoot = createRoot(container)
+await act(async () => {
+  localeRoot.render(React.createElement(Component, { locked: false, ...injected, t: (k) => k }))
+})
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('--- language: locale service ---')
+console.log('service says zh, document says en:', JSON.stringify(menuCopy()))
+if (menuCopy().search !== '搜索模型或提供商…') {
+  throw new Error(`the locale service must outrank <html lang>, got ${JSON.stringify(menuCopy().search)}`)
+}
+localeActive = 'en'
+await act(async () => {
+  for (const fn of [...localeListeners]) fn()
+  await Promise.resolve()
+})
+console.log('service switched to en           :', JSON.stringify(menuCopy()))
+if (menuCopy().search !== 'Search model or provider…') {
+  throw new Error(`the locale service subscription must re-render the panel, got ${JSON.stringify(menuCopy().search)}`)
+}
+if (localeListeners.size === 0) throw new Error('the panel never subscribed to the locale service')
+await act(async () => { localeRoot.unmount() })
+if (localeListeners.size !== 0) throw new Error('the locale subscription outlived the panel')
+
+// 12c. A render that arrives with no locale source at all (an older carrier, or
+//      the seat mounted by hand) still follows the document's declaration.
+const bareRoot = createRoot(container)
+await act(async () => {
+  bareRoot.render(React.createElement(Component, { locked: false, ...injected, locale: undefined, t: (k) => k }))
+})
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+await setLang('zh-CN')
+console.log('no locale source :', JSON.stringify(menuCopy()))
+if (menuCopy().search !== '搜索模型或提供商…') {
+  throw new Error('a panel without a locale source must still follow <html lang>')
+}
+await act(async () => { bareRoot.unmount() })
 
 console.log('INTERACTION OK')

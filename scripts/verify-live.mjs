@@ -7,14 +7,20 @@
 // widths, which is what a jsdom test cannot show.
 //
 // Run: node scripts/verify-live.mjs
+//      DSH_LIVE_ORIGIN=http://127.0.0.1:19387 node scripts/verify-live.mjs
 import { createHash, createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-const ORIGIN = 'http://127.0.0.1:3080'
-const AUTHORITY = '127.0.0.1:3080'
+// The surface under test. 3080 is the `web` profile, which links this repo, so
+// the file on disk is what that shell serves. DSH_LIVE_ORIGIN points the same
+// run at another live shell: the desktop app's 19387 is the one the user looks
+// at, and it serves its own installed copy of lib/client.js, so a change has to
+// be carried into that profile before it can be seen there at all.
+const ORIGIN = process.env.DSH_LIVE_ORIGIN ?? 'http://127.0.0.1:3080'
+const AUTHORITY = new URL(ORIGIN).host
 const CREDENTIALS = join(homedir(), '.dsh/.credentials.yaml')
 
 /** The durable signing secret written by the host's browser-auth initialization. */
@@ -132,6 +138,40 @@ if (seat.trigger) {
   })
   console.log('--- popup after click ---')
   console.log(JSON.stringify(open, null, 2))
+  if (!open.searchFocused) throw new Error('the popup must open with the caret in the search box')
+
+  // ── The search box carries no focus highlight ────────────────────────────
+  // The field is focused for the whole life of the popup, so an accent border
+  // would be lit from the moment the panel opens and read as a state to clear;
+  // the caret is the cue. The painted border is compared against both tokens,
+  // measured on probe elements rather than by blurring the field — blur is this
+  // popup's dismiss gesture, so reading the unfocused state that way closes it.
+  const ring = await page.evaluate(() => {
+    const search = document.querySelector('.dsh-mp2-search')
+    const token = (name) => {
+      const probe = document.createElement('div')
+      probe.style.cssText = `position:absolute;width:0;height:0;border:1px solid var(${name})`
+      search.parentElement.appendChild(probe)
+      const color = getComputedStyle(probe).borderTopColor
+      probe.remove()
+      return color
+    }
+    return {
+      painted: getComputedStyle(search).borderTopColor,
+      resting: token('--dsw-alias-border-l1'),
+      brand: token('--dsw-alias-brand-primary'),
+      focused: document.activeElement === search,
+    }
+  })
+  console.log('--- search focus ring ---')
+  console.log(JSON.stringify(ring))
+  if (!ring.focused) throw new Error('the focus probe ran with the caret outside the search box')
+  if (ring.painted !== ring.resting) {
+    throw new Error(`the search box does not wear its resting border: ${ring.painted} ≠ ${ring.resting}`)
+  }
+  if (ring.painted === ring.brand) {
+    throw new Error(`the search box lights its border on focus: ${ring.painted}`)
+  }
 
   // Search a provider name: both columns must narrow.
   await page.fill('.dsh-mp2-search', 'deep')
@@ -250,6 +290,102 @@ if (seat.trigger) {
   if (settled !== jump.expected) {
     throw new Error(`the list kept moving after the click: settled at ${settled}, expected ${jump.expected}`)
   }
+
+  // ── Footer: the way out to Settings → 模型 ────────────────────────────────
+  // The picker can only list what the configured providers offer, so it carries
+  // one fixed row that opens the page which configures them. This crosses two
+  // plugins — the picker writes the settings shell's own store — so only a real
+  // shell proves the store is reachable, which is why it is checked live.
+  if (await page.evaluate(() => document.querySelector('.dsh-mp2-menu') === null)) {
+    await page.click('.dsh-mp2-triggerLeft')
+    await page.waitForTimeout(500)
+  }
+  const footer = await page.evaluate(() => {
+    const row = document.querySelector('.dsh-mp2-footer')
+    const button = document.querySelector('.dsh-mp2-footerAction')
+    const menu = document.querySelector('.dsh-mp2-menu')
+    return {
+      present: row !== null,
+      parent: row?.parentElement?.className ?? null,
+      insideList: row?.closest('.dsh-mp2-list') !== null,
+      label: button?.textContent ?? null,
+      svgs: button?.querySelectorAll('svg').length ?? 0,
+      // 0 means the row sits on the popup's own bottom edge, under the body.
+      gapToBottom: row === null || menu === null
+        ? null
+        : Math.round(menu.getBoundingClientRect().bottom - row.getBoundingClientRect().bottom),
+    }
+  })
+  console.log('--- settings footer ---')
+  console.log(JSON.stringify(footer))
+  if (!footer.present) throw new Error('the model popup carries no settings footer')
+  if (footer.insideList) throw new Error('the footer scrolls with the list instead of sitting under it')
+  if (footer.parent !== 'dsh-mp2-menu') throw new Error(`the footer is not a direct child of the popup: ${footer.parent}`)
+  if (footer.svgs !== 2) throw new Error(`the footer must be drawn with vector icons, got ${footer.svgs} svg`)
+
+  await page.click('.dsh-mp2-footerAction')
+  await page.waitForTimeout(1200)
+  const handedOff = await page.evaluate(() => {
+    const panel = document.querySelector('[data-shortcut-modal="settings"]')
+    const active = panel?.querySelector('nav button[aria-current="true"]')
+    return {
+      pickerClosed: document.querySelector('.dsh-mp2-menu') === null,
+      settingsOpen: panel !== null,
+      activeSection: active?.textContent?.trim() ?? null,
+      sections: panel === null ? [] : [...panel.querySelectorAll('nav button')].map((b) => b.textContent.trim()),
+      // The Models page is the only section whose copy talks about API keys.
+      bodyMentionsApi: panel !== null && /API/.test(panel.innerText),
+    }
+  })
+  console.log(JSON.stringify(handedOff))
+  if (!handedOff.settingsOpen) throw new Error('the footer did not open the settings panel')
+  if (!handedOff.pickerClosed) throw new Error('the footer left the picker open over the settings panel')
+  if (handedOff.activeSection === null) throw new Error('the settings panel opened with no active section')
+  if (!handedOff.bodyMentionsApi) {
+    throw new Error(`the footer must land on the models section, got "${handedOff.activeSection}"`)
+  }
+  await page.screenshot({ path: join(process.cwd(), 'live-settings-models.png') })
+  // Close it again: a verification run leaves the session as it found it.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  if (await page.evaluate(() => document.querySelector('[data-shortcut-modal="settings"]') !== null)) {
+    throw new Error('the settings panel did not close on Escape')
+  }
+
+  // ── The panel speaks the app's language ──────────────────────────────────
+  // DSH's UI language is a product preference (Settings → General → Language),
+  // not a browser fact: the panel must read the app's own source — the `locale`
+  // service the whole shell reads — and only fall back to the document, then the
+  // navigator. The two probes below pin both halves of that rule.
+  await page.click('.dsh-mp2-triggerLeft')
+  await page.waitForTimeout(600)
+  const appCopy = () => page.evaluate(() => ({
+    declared: document.documentElement.lang,
+    search: document.querySelector('.dsh-mp2-search')?.placeholder ?? null,
+    footer: document.querySelector('.dsh-mp2-footerLabel')?.textContent ?? null,
+  }))
+  const before = await appCopy()
+  console.log('--- language ---')
+  console.log('app declares :', JSON.stringify(before))
+  // 1. The copy agrees with the language the app declares it is rendering.
+  const zhCopy = before.declared.toLowerCase().startsWith('zh')
+  if (zhCopy !== (before.search === '搜索模型或提供商…')) {
+    throw new Error(`the panel's language does not match the app's (${before.declared}): ${JSON.stringify(before.search)}`)
+  }
+  // 2. A stray attribute does not move it: the app's own preference outranks the
+  //    document, so forcing <html lang> while the locale service says otherwise
+  //    must change nothing. This is the live twin of the jsdom precedence test.
+  const stray = before.declared.toLowerCase().startsWith('zh') ? 'en' : 'zh-CN'
+  await page.evaluate((tag) => { document.documentElement.lang = tag }, stray)
+  await page.waitForTimeout(500)
+  const after = await appCopy()
+  console.log(`forced lang=${stray} :`, JSON.stringify(after))
+  if (after.search !== before.search || after.footer !== before.footer) {
+    throw new Error(`a forced <html lang> moved the copy, so the app's own preference is not what is read: ${JSON.stringify(after)}`)
+  }
+  await page.evaluate((tag) => { document.documentElement.lang = tag }, before.declared)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 }
 
 await page.screenshot({ path: join(process.cwd(), 'live-composer.png') })
