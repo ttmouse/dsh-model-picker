@@ -33,21 +33,40 @@ model list (see **Configure official models**).
 
 ## Supplier chip
 
-The supplier's leading character rides ahead of the model name — `D` for
-DeepSeek, `智` for 智谱 GLM — on the **closed trigger** as well as on every row in
-the list, so a model's source is legible before the picker is ever opened.
+A model row leads with the **mark of whoever made the model** — DeepSeek's whale,
+Zhipu's mark, Qwen's — on the **closed trigger** as well as on every row in the
+list, so which model is in use, and whose it is, reads before the picker is ever
+opened. Marks are the published mono cuts from
+[`@lobehub/icons-static-svg`](https://github.com/lobehub/lobe-icons) (MIT),
+inlined as paths on their own 24×24 grid and filled with `currentColor`.
 
-- The trigger's `max-width` (300px) leaves room for the chip's footprint (16px
-  plus its gap) on top of the name budget, so wearing the chip costs the model
-  name no characters. When the composer row runs short it is the model
-  NAME that truncates, never the effort zone: the effort zone reports a state in
-  one short word, and a clipped state word is a different string ("Hi..."), while
-  a name is free-form, truncates readably, and the tooltip carries it in full.
-- The chip names the **display** supplier, so a row served by a folded
-  `(modlens vision)` route wears its base provider's chip rather than one of its
-  own.
-- Each supplier also gets a tint. Without it `17an-db`, `17an-anbot` and
-  `17an-mumiao` would all show a bare `1` and read as one supplier.
+- The mark names the **model's maker**, not the supplier: `17an-mumiao`,
+  `qwen-token-plan-cn` and `opencode-go1` all serve `deepseek-v4-flash`, and the
+  question a row answers is "what am I picking". A per-supplier mark would answer
+  "who resells it" and, worse, could only ever be a letter for the three `17an`
+  floors.
+- **Two rules, lab first.** The model's own lab is read from the leading token of
+  any `vendor/model`, `vendor:model` or `vendor_model` segment — that is what
+  catches `17an-db/deepseek-v4.1-flash`. Only when no lab is named does the
+  **host** in the label earn a mark, matched as a whole word, so `Composer 2.5 ·
+  Cursor` and `Auto · Cursor` wear Cursor's.
+- The order between them is the whole design: `grok-4.7@500k · Cursor` is Grok's
+  model resold **through** Cursor, and `DeepSeek-V4.1-Flash · Trae CN` is
+  DeepSeek's through Trae. Reading the host first would relabel both with the
+  wrong maker — exactly the mistake a mark exists to prevent — so a host mark
+  only ever appears on a row whose model segment named no lab at all.
+- A row whose maker cannot be named honestly — `Auto · routing group`,
+  `Space-Bunny`, `Ling 3.1 Flash Free` — keeps the **supplier's tinted initial**
+  instead. The two shapes say different things at a glance: a mark is a lab, a
+  tinted uppercase letter is "the picker cannot name this row's maker yet". A
+  mislabelled logo would be worse than a letter the panel can always back up.
+- The fallback letter is matched by a **fixed prefix list**, deliberately not a
+  generic "first word" rule: `mimo` and `hy3` are real families whose ids carry
+  no lab in them, so they are listed by name, while a rule loose enough to guess
+  them would also hand `auto` a logo it has not earned.
+- Supplier floors in the left column keep the **letter on its tint**: a floor
+  names a supplier, and `17an-db`, `17an-anbot` and `17an-mumiao` would otherwise
+  be indistinguishable. The model list beside it names labs, which have marks.
 - The tint is **chosen, not hashed**. A hue derived from the route id produced
   ten unrelated colours in one panel, gave neighbouring suppliers near-identical
   chips, and let the palette drift as providers were added. Each supplier now
@@ -56,13 +75,24 @@ the list, so a model's source is legible before the picker is ever opened.
 - Every chip is held at the **same lightness and chroma** (OKLCH, hue varies
   only). No supplier shouts louder than another, and no supplier's chip can
   vanish into the panel the way a mid-blue one did under a fixed saturation.
-- The glyph takes the **surrounding ink** (`color: inherit`), so it is dark on
-  the light theme and light on the dark one (12.35:1 and 6.56:1 measured on
+- Both shapes take the **surrounding ink** (`color: inherit`), so they are dark
+  on the light theme and light on the dark one (12.35:1 and 6.56:1 measured on
   painted pixels). A per-hue glyph colour was tried and removed: a light tint of
   the hue is legible on the dark theme and effectively invisible on the light
-  one, which is the theme nobody checks.
-- Only the tint carries the hue; the panel's one accent stays the check mark on
-  the model in use.
+  one, which is the theme nobody checks. Full-colour brand marks were declined
+  for the same reason the tint is held down: a dozen brand palettes would fight
+  the panel's one accent, which is the check mark on the model in use.
+- Only the tint carries a hue; a brand mark carries none, because the mark *is*
+  the shape and a chip behind it would only make a logo read as a letter.
+- The trigger's `max-width` (300px) leaves room for the avatar's footprint (16px
+  plus its gap) on top of the name budget, so wearing it costs the model
+  name no characters. When the composer row runs short it is the model
+  NAME that truncates, never the effort zone: the effort zone reports a state in
+  one short word, and a clipped state word is a different string ("Hi..."), while
+  a name is free-form, truncates readably, and the tooltip carries it in full.
+- The avatar is **hidden from the accessibility tree**: the supplier and the model
+  are already named in the trigger tooltip and the row detail, so a mark would
+  only repeat them.
 
 ## Provider folding
 
@@ -302,7 +332,19 @@ colour changes stay, because they aid comprehension rather than being motion.
   of the live seat. It also asserts every icon is an **SVG**, never a text emoji
   or symbol character, in the closed trigger and in both popups, and that the
   search box declares no focus border — jsdom answers no `:focus` through
-  `getComputedStyle`, so the stylesheet text is what this half can check. The settings
+  `getComputedStyle`, so the stylesheet text is what this half can check. The
+  avatar is covered from both ends: every id shape that has to resolve a lab
+  (`glm-5.3-flash` by id, `deepseek/deepseek-v4-flash-vision-exp` after a
+  `vendor/` prefix, `MiniMaxAI/MiniMax-M3` in the vendor segment, `hy3` by family
+  abbreviation) does resolve one, the two anchor pairs (`DeepSeek Chat` vs the
+  vendor-prefixed id, `GLM-4.6` vs `glm-5.3-flash`) wear the *same* mark, distinct
+  labs wear *different* marks, a host-only label (`Composer 2.5 · Cursor`) earns
+  the host's mark — and, the case the two rules exist for, a resold lab
+  (`Grok 4.7 @ 500k · Cursor`, `DeepSeek-V4.1-Flash · Trae CN`) keeps the **lab's**
+  mark rather than the host's. A row naming no lab at all keeps the supplier's
+  tinted initial, at a curated OKLCH hue. Supplier floors are asserted to keep the
+  letter and a distinct hue each, so the two shapes cannot drift into one. The
+  settings
   hand-off is covered the same way: the footer sits outside the scroll area,
   clicking it writes `models` to the settings seat and closes the popup without
   picking a model, the no-store carrier falls back to the `settings.open` command
@@ -332,11 +374,15 @@ forges the same signed browser-session cookie the host mints — and checks what
 jsdom cannot: the cursor row's computed background, that the search box paints
 its resting border rather than the accent one while it holds focus, that a
 supplier click lands instead of animating, and that the footer's hand-off really
-opens Settings on the Models section. It closes the panel again, so a run leaves
-the session as it found it. It targets the `web` profile on `:3080` by default;
-`DSH_LIVE_ORIGIN=http://127.0.0.1:19387` points it at the desktop app instead,
-which serves its own installed copy of `lib/client.js` — a change has to be
-carried into that profile before the run can see it.
+opens Settings on the Models section. It also measures the first row's avatar in
+a real browser: the mark must have a non-zero, non-overflowing box, keep its
+`fill-rule="evenodd"` (without it an outline mark like Qwen's fills its own
+counters), paint in a real colour rather than a transparent fill, carry no chip
+behind it, and render no letter beside it. It closes the panel again, so a run
+leaves the session as it found it. It targets the `web` profile on `:3080` by
+default; `DSH_LIVE_ORIGIN=http://127.0.0.1:19387` points it at the desktop app
+instead, which serves its own installed copy of `lib/client.js` — a change has to
+be carried into that profile before the run can see it.
 
 `node scripts/screenshot.mjs` regenerates the README image. It stars two models
 from different suppliers first — the favorites group is the feature a still image
@@ -369,3 +415,14 @@ const inject = ['slots', 'sessions', 'modelDirectories', 'remote', 'remote.sessi
 Dropping `remote` / `remote.session` throws
 `cannot get property "remote.session" without inject` inside the seat's inject
 factory; the entry abdicates and the enhanced picker never appears.
+
+## Third-party assets
+
+The brand marks a model row can wear are the published mono cuts from
+[`@lobehub/icons-static-svg`](https://github.com/lobehub/lobe-icons), MIT
+licensed, inlined into `lib/client.js` as path data. They are the official marks
+rather than redrawn approximations, and only the ones a configured route can
+resolve to are carried — each is attributed to LobeHub in the source block it
+lives in. The interface glyphs (star, check, chevron, panel toggle, image,
+settings, external) are [Lucide](https://lucide.dev), ISC licensed, inlined the
+same way. No icon font and no runtime icon dependency is installed.

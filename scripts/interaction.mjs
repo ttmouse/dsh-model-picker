@@ -135,6 +135,28 @@ const GROUPS = [
   ] },
   { id: '17an', name: '一起安', models: [
     { id: 'qwen3-max', name: 'Qwen3 Max', description: 'qwen flagship' },
+    // The id shapes a real reseller serves, one per way a brand has to be
+    // found: from the id alone, from the name alone, from the segment after a
+    // `vendor/` prefix (17an-mumiao ships exactly this id), from a family
+    // abbreviation with no lab in it, and from a row that names no lab at all.
+    { id: 'glm-5.3-flash', name: 'glm-5.3-flash', description: 'id names the lab' },
+    { id: 'deepseek/deepseek-v4-flash-vision-exp', name: 'DeepSeek V4 Flash Vision', description: 'vendor-prefixed id' },
+    { id: 'MiniMaxAI/MiniMax-M3', name: 'MiniMax M3', description: 'lab in the vendor segment' },
+    { id: 'hy3', name: 'Hy3', description: 'family abbreviation' },
+    // Hosts, the second rule. `Composer` names no lab, so the only brand in the
+    // label is the host; `Auto · Cursor` names no model at all.
+    { id: 'composer-2.5', name: 'Composer 2.5 · Cursor', description: 'host names the mark' },
+    { id: 'auto', name: 'Auto · Cursor', description: 'host only' },
+    // …and the trap the two rules exist to avoid: Grok's model RESOLD through
+    // Cursor. The lab has to win, or the row would claim the wrong maker. Its
+    // reference is `grok-4.5`, the same lab without a host in the label.
+    { id: 'grok-4.5', name: 'Grok 4.5', description: 'lab reference' },
+    { id: 'grok-4.7@500k', name: 'Grok 4.7 @ 500k · Cursor', description: 'lab wins over host' },
+    { id: 'deepseek-v4.1-flash', name: 'DeepSeek-V4.1-Flash · Trae CN', description: 'lab wins over host again' },
+    // A row whose id and name name no lab the brand table knows: it must keep the
+    // supplier's tinted initial rather than borrow a mark it cannot back up.
+    // Kept last, because the keyboard tests walk to the end of the list.
+    { id: 'default-model', name: '一起安 Auto', description: 'routed, no brand' },
   ] },
 ]
 
@@ -282,20 +304,27 @@ if (left.getAttribute('aria-label') !== left.title) {
   throw new Error('the trigger tooltip and its accessible name must agree')
 }
 
-// The supplier chip rides on the closed trigger too, so the source is legible
-// without opening the picker at all.
+// The avatar rides on the closed trigger too, so which model is in use — and
+// whose it is — is legible without opening the picker at all. The model here is
+// a DeepSeek one, so it wears DeepSeek's own mark, not a letter.
 const triggerChip = () => {
   const chip = left.querySelector('.dsh-mp2-avatar')
-  return chip === null ? null : { text: chip.textContent, bg: chip.style.getPropertyValue('--dsh-mp2-chip-bg') }
+  return chip === null ? null : {
+    text: chip.textContent,
+    bg: chip.style.getPropertyValue('--dsh-mp2-chip-bg'),
+    brand: chip.classList.contains('dsh-mp2-avatarBrand'),
+    paths: chip.querySelectorAll('svg path').length,
+  }
 }
 console.log('trigger chip:', JSON.stringify(triggerChip()))
-if (triggerChip()?.text !== 'D') throw new Error(`the trigger chip must show the supplier initial, got ${JSON.stringify(triggerChip())}`)
-// The tint is a curated OKLCH value: fixed chroma and lightness, hue only, so
-// one supplier cannot shout louder than another. It used to be a hash of the
-// route id, which put ten unrelated hues in one panel.
-if (triggerChip()?.bg === '') throw new Error('the trigger chip carries no tint')
-if (!/^oklch\(/.test(triggerChip()?.bg ?? '')) {
-  throw new Error(`the trigger chip tint must be a curated OKLCH value, got ${JSON.stringify(triggerChip()?.bg)}`)
+if (triggerChip()?.brand !== true) {
+  throw new Error(`a branded model must wear its mark on the trigger, got ${JSON.stringify(triggerChip())}`)
+}
+if (triggerChip()?.paths === 0) throw new Error('the trigger brand mark carries no path')
+// A mark is not a letter on a chip: it takes no tint, because the tint is what
+// turns a bare letter into a legible marker, and a logo needs no such help.
+if (triggerChip()?.bg !== '') {
+  throw new Error(`a brand mark must not wear the chip tint, got ${JSON.stringify(triggerChip()?.bg)}`)
 }
 if (left.querySelector('.dsh-mp2-triggerLabel').textContent !== 'DeepSeek Reasoner') {
   throw new Error('the trigger chip displaced the model name')
@@ -385,31 +414,162 @@ if (groupEl('Recent').querySelector('.dsh-mp2-option .dsh-mp2-description')?.tex
 const headingSvgs = () => container.querySelectorAll('.dsh-mp2-list .dsh-mp2-groupHeader svg').length
 if (headingSvgs() !== 0) throw new Error(`a group heading rendered an icon again (${headingSvgs()} svg)`)
 
-// 2c. Every row wears its supplier's leading character ahead of the model name,
-// so the source is legible without reading the group heading back up the list.
+// 2c. Every row wears its maker's mark ahead of the model name. The model list
+// names LABS (one model id is routinely resold by several suppliers), so three
+// models from three labs must wear three different marks — and a model whose
+// maker the picker cannot name keeps the supplier's tinted initial, because a
+// mark it cannot name honestly is worse than a letter it can.
 const avatarEl = (name) => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-option')]
   .find((o) => o.querySelector('.dsh-mp2-modelName')?.textContent === name)
   ?.querySelector('.dsh-mp2-avatar')
-const avatarOf = (name) => avatarEl(name)?.textContent
-const hueOf = (name) => avatarEl(name)?.style.getPropertyValue('--dsh-mp2-chip-bg')
-console.log('avatars           :', JSON.stringify({
+const avatarOf = (name) => {
+  const el = avatarEl(name)
+  if (el === undefined) return null
+  return {
+    brand: el.classList.contains('dsh-mp2-avatarBrand'),
+    text: el.textContent,
+    paths: [...el.querySelectorAll('svg path')].map((p) => p.getAttribute('d')),
+    hue: el.style.getPropertyValue('--dsh-mp2-chip-bg'),
+  }
+}
+const marks = {
   DeepSeek: avatarOf('DeepSeek Chat'),
   GLM: avatarOf('GLM-4.6'),
   qwen: avatarOf('Qwen3 Max'),
+  namesIdOnly: avatarOf('glm-5.3-flash'),
+  vendorPrefix: avatarOf('DeepSeek V4 Flash Vision'),
+  vendorLab: avatarOf('MiniMax M3'),
+  familyAbbrev: avatarOf('Hy3'),
+  hostOnly: avatarOf('Composer 2.5 · Cursor'),
+  hostBare: avatarOf('Auto · Cursor'),
+  labBeatsHost: avatarOf('Grok 4.7 @ 500k · Cursor'),
+  labBeatsHost2: avatarOf('DeepSeek-V4.1-Flash · Trae CN'),
+  grokRef: avatarOf('Grok 4.5'),
+  unnamed: avatarOf('一起安 Auto'),
   folded: avatarOf('DeepSeek Reasoner (modlens vision)'),
-}))
-if (avatarOf('DeepSeek Chat') !== 'D') throw new Error(`latin initial wrong: ${avatarOf('DeepSeek Chat')}`)
-if (avatarOf('GLM-4.6') !== '智') throw new Error(`CJK initial wrong: ${avatarOf('GLM-4.6')}`)
-if (avatarOf('Qwen3 Max') !== '一') throw new Error(`CJK initial wrong: ${avatarOf('Qwen3 Max')}`)
-// A folded route has no row of its own, so its models must wear the base
-// supplier's chip — same hue, not a colour of their own.
-if (hueOf('DeepSeek Reasoner (modlens vision)') !== hueOf('DeepSeek Chat')) {
-  throw new Error('a folded route wore its own chip instead of its base supplier\'s')
 }
-// Suppliers are told apart by tint, so no two of them may share a hue.
-const supplierHues = [hueOf('DeepSeek Chat'), hueOf('GLM-4.6'), hueOf('Qwen3 Max')]
-if (new Set(supplierHues).size !== supplierHues.length) {
-  throw new Error(`suppliers share a chip colour: ${JSON.stringify(supplierHues)}`)
+console.log('avatars           :', JSON.stringify(Object.fromEntries(
+  Object.entries(marks).map(([name, mark]) => [name, mark === null ? null
+    : { brand: mark.brand, text: mark.text, paths: mark.paths.length, hue: mark.hue }]),
+)))
+const BRANDED = [
+  'DeepSeek', 'GLM', 'qwen', 'namesIdOnly', 'vendorPrefix', 'vendorLab',
+  'familyAbbrev', 'hostOnly', 'hostBare', 'labBeatsHost', 'labBeatsHost2',
+]
+for (const name of BRANDED) {
+  if (marks[name]?.brand !== true) throw new Error(`"${name}" does not wear a brand mark: ${JSON.stringify(marks[name])}`)
+  if (marks[name].paths === 0) throw new Error(`the "${name}" mark carries no path`)
+  if (marks[name].text !== '') throw new Error(`a brand mark must not also render a letter: ${JSON.stringify(marks[name].text)}`)
+}
+// The lab is found wherever the id puts it: in the id itself, after a `vendor/`
+// prefix, in the vendor segment, or from a family abbreviation with no lab in
+// it. A rule that only read the first token would pass the first two and fail
+// the rest.
+// One lab, one shape — and different labs, different shapes. A table that
+// resolved every row to the same mark would pass a per-row spot check and be
+// useless in the list, which is exactly the failure a mark is meant to prevent.
+const shapeOf = (name) => marks[name].paths.join('|')
+const sameLab = [['DeepSeek', 'vendorPrefix'], ['GLM', 'namesIdOnly']]
+for (const [a, b] of sameLab) {
+  if (shapeOf(a) !== shapeOf(b)) throw new Error(`"${a}" and "${b}" are the same lab but wear different marks`)
+}
+const distinctLabs = ['DeepSeek', 'GLM', 'qwen', 'vendorLab', 'familyAbbrev', 'hostOnly', 'grokRef']
+const distinctShapes = new Set(distinctLabs.map(shapeOf))
+if (distinctShapes.size !== distinctLabs.length) {
+  throw new Error(`two different marks collided: ${JSON.stringify(distinctLabs.map(shapeOf))}`)
+}
+console.log('labs resolved     :', JSON.stringify({
+  deepseek: shapeOf('DeepSeek').length,
+  zhipu: shapeOf('GLM').length,
+  qwen: shapeOf('qwen').length,
+  minimax: shapeOf('vendorLab').length,
+  hunyuan: shapeOf('familyAbbrev').length,
+  cursor: shapeOf('hostOnly').length,
+}))
+
+// The lab beats the host, which is the entire reason there are two rules. Both
+// of these rows name Cursor or Trae in the label and neither is their model:
+// `grok-4.7@500k` is Grok's, `deepseek-v4.1-flash` is DeepSeek's. A host-first
+// scan would hand both of them the wrong maker — the exact mistake a mark is
+// supposed to prevent, and one a spot check on `Composer · Cursor` cannot see.
+const beatsHost = [
+  ['labBeatsHost', 'grokRef'], // Grok's mark, not Cursor's
+  ['labBeatsHost2', 'DeepSeek'], // DeepSeek's mark, not Trae's
+]
+for (const [row, lab] of beatsHost) {
+  if (shapeOf(row) !== shapeOf(lab)) {
+    throw new Error(`"${row}" wore the host's mark instead of the lab's (${lab})`)
+  }
+}
+if (shapeOf('labBeatsHost') === shapeOf('hostOnly')) {
+  throw new Error('a resold Grok row wore Cursor\'s mark because the label says Cursor')
+}
+console.log('host fallback     :', JSON.stringify({
+  hostOnly: shapeOf('hostOnly').length,
+  hostBare: shapeOf('hostBare').length,
+  labWinsOverHost: shapeOf('labBeatsHost') === shapeOf('grokRef'),
+}))
+// The table and the rules have to agree in both directions, or the data block
+// rots silently: a mark no rule can reach is a mark nobody can see, and a rule
+// pointing at a mark the table does not carry would render an empty box. Neither
+// is visible to a spot check on any single row.
+const brandTable = (() => {
+  const source = readFileSync(join(root, 'lib/client.js'), 'utf8')
+  const slice = (from, to) => {
+    const at = source.indexOf(from)
+    if (at === -1) throw new Error(`lib/client.js no longer declares ${JSON.stringify(from)}`)
+    return source.slice(at, source.indexOf(to, at) + to.length)
+  }
+  const targets = (block) => [...block.matchAll(/\['([^']*)', '([^']*)'\]/gu)]
+    .map((m) => ({ name: m[1], mark: m[2] }))
+  return {
+    marks: [...slice('const BRAND_PATHS = {', '\n  }\n').matchAll(/^    ([a-z0-9]+):/gmu)].map((m) => m[1]),
+    rules: [...targets(slice('const BRAND_PREFIXES = [', '\n  ]\n'))],
+    hosts: [...targets(slice('const BRAND_HOSTS = [', '\n  ]\n'))],
+  }
+})()
+const reachable = [...brandTable.rules, ...brandTable.hosts].map((rule) => rule.mark)
+const unreachable = brandTable.marks.filter((mark) => !reachable.includes(mark))
+if (unreachable.length > 0) {
+  throw new Error(`the brand table carries marks no rule can reach: ${JSON.stringify(unreachable)}`)
+}
+const dangling = [...new Set(reachable)].filter((mark) => !brandTable.marks.includes(mark))
+if (dangling.length > 0) {
+  throw new Error(`a rule points at a mark the table does not carry: ${JSON.stringify(dangling)}`)
+}
+// The order of the two rules is load-bearing, so the tables have to stay split.
+// What may not overlap is the NAME a rule matches on — `cursor` is legitimately
+// in both blocks as a target (Composer is Cursor's model, and Cursor is also a
+// host), but a name in both MATCH lists would be decided by table order alone,
+// and moving a host into the lab table would relabel `cursor/grok-4.7`.
+const bothBlocks = brandTable.rules
+  .map((rule) => rule.name)
+  .filter((name) => brandTable.hosts.some((host) => host.name === name))
+if (bothBlocks.length > 0) {
+  throw new Error(`a name is matched as both a lab and a host: ${JSON.stringify(bothBlocks)}`)
+}
+console.log('brand table       :', JSON.stringify({
+  marks: brandTable.marks.length,
+  labRules: brandTable.rules.length,
+  hostRules: brandTable.hosts.length,
+  unreachable: unreachable.length,
+}))
+
+// The fallback half: an id and a name that name no lab the table knows.
+if (marks.unnamed?.brand !== false) {
+  throw new Error(`an unnamed family must fall back to the supplier initial, got ${JSON.stringify(marks.unnamed)}`)
+}
+if (marks.unnamed.text !== '一') throw new Error(`the fallback initial is wrong: ${JSON.stringify(marks.unnamed.text)}`)
+// The tint is a curated OKLCH value: fixed chroma and lightness, hue only, so
+// one supplier cannot shout louder than another. It used to be a hash of the
+// route id, which put ten unrelated hues in one panel.
+if (!/^oklch\(/.test(marks.unnamed.hue)) {
+  throw new Error(`the fallback chip tint must be a curated OKLCH value, got ${JSON.stringify(marks.unnamed.hue)}`)
+}
+// A folded route has no row of its own, so its models must wear the mark of the
+// base supplier's model — the same model, after all, not a mark of their own.
+if (marks.folded?.paths.join('|') !== marks.DeepSeek.paths.join('|')) {
+  throw new Error('a folded route wore its own mark instead of its base model\'s')
 }
 
 // 2c. Host facts: the context chip and the image glyph must render on the
@@ -504,11 +664,19 @@ if (modelNames().length === 0) throw new Error('search showed nothing')
 await act(async () => { typeInto(search, '') })
 console.log('left column       :', providerNames())
 
-// Every supplier wears its chip in the elevator too.
+// Every supplier floor wears its tinted initial in the elevator. The floors keep
+// the letter even where the models beside them wear a mark: a floor names a
+// SUPPLIER, and the three `17an` floors would otherwise be indistinguishable,
+// while the model list names labs, which have marks of their own.
 const elevatorChips = [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp2-provider')].map((btn) => {
   const chip = btn.querySelector('.dsh-mp2-avatar')
   const name = btn.querySelector('.dsh-mp2-providerName')?.textContent
-  return { name, chipText: chip?.textContent ?? null, chipHue: chip?.style.getPropertyValue('--dsh-mp2-hue') ?? null }
+  return {
+    name,
+    chipText: chip?.textContent ?? null,
+    brand: chip?.classList.contains('dsh-mp2-avatarBrand') ?? false,
+    chipHue: chip?.style.getPropertyValue('--dsh-mp2-chip-bg') ?? null,
+  }
 })
 console.log('elevator chips    :', JSON.stringify(elevatorChips))
 // The history and favorites floors are mirrors, not suppliers. A mirror that
@@ -518,10 +686,22 @@ const MIRROR_FLOORS = ['Recent', 'Favorites'].filter((name) => providerRow(name)
 if (!MIRROR_FLOORS.includes('Recent')) throw new Error('the history floor is missing from the elevator')
 if (MIRROR_FLOORS.includes('Favorites')) throw new Error('a favorites floor with no rows must not be rendered')
 const isMirrorFloor = (name) => MIRROR_FLOORS.includes(name)
-for (const { name, chipText } of elevatorChips) {
+for (const { name, chipText, brand, chipHue } of elevatorChips) {
   if (isMirrorFloor(name)) continue
+  if (brand) throw new Error(`supplier floor "${name}" wears a model's brand mark`)
   if (chipText === null) throw new Error(`supplier "${name}" is missing its chip in the elevator`)
   if (chipText.length === 0) throw new Error(`supplier "${name}" has an empty chip`)
+  // The tint is a curated OKLCH value: fixed chroma and lightness, hue only, so
+  // one supplier cannot shout louder than another. It used to be a hash of the
+  // route id, which put ten unrelated hues in one panel.
+  if (!/^oklch\(/.test(chipHue ?? '')) {
+    throw new Error(`supplier "${name}" wears a tint that is not a curated OKLCH value: ${JSON.stringify(chipHue)}`)
+  }
+}
+// Suppliers are told apart by tint, so no two of them may share a hue.
+const floorHues = elevatorChips.filter(({ name }) => !isMirrorFloor(name)).map(({ chipHue }) => chipHue)
+if (new Set(floorHues).size !== floorHues.length) {
+  throw new Error(`suppliers share a chip colour: ${JSON.stringify(floorHues)}`)
 }
 // A mirror floor is not a supplier — it must not wear a chip, and it counts
 // its own rows. The history floor is the lit one, because its heading is the
@@ -597,10 +777,10 @@ console.log('tip after vision pick:', tipAfterVision)
 if (tipAfterVision !== 'DeepSeek · DeepSeek Reasoner (modlens vision)') {
   throw new Error(`a folded route must name its base supplier, got "${tipAfterVision}"`)
 }
-// …and the trigger chip must follow the same rule: the base supplier's tint,
-// not a colour of the folded route's own.
-if (triggerChip()?.text !== 'D') {
-  throw new Error(`the trigger chip must show the base supplier, got ${JSON.stringify(triggerChip())}`)
+// …and the trigger avatar must follow the same rule: the mark of the base
+// supplier's model, not a mark of the folded route's own.
+if (triggerChip()?.brand !== true || triggerChip()?.paths === 0) {
+  throw new Error(`the trigger must wear the base model's mark, got ${JSON.stringify(triggerChip())}`)
 }
 
 // 8. The elevator: with no query, a supplier row is a floor, not a filter —
@@ -682,8 +862,10 @@ if (searchNow().getAttribute('aria-activedescendant') !== activeEls()[0].id) {
 }
 
 // ↓/↑ walk one row at a time and hold at both ends. Rows, in order: the two
-// history rows, then DeepSeek's three, then GLM-4.6, then Qwen3 Max (收藏 is
-// empty here, so it contributes no row).
+// history rows, then DeepSeek's three, then GLM-4.6, then 一起安's five (收藏 is
+// empty here, so it contributes no row). The last row is read from the DOM
+// rather than named, so adding a fixture row does not make this a false alarm.
+const lastModel = () => modelNames().at(-1)
 await press('ArrowDown')
 await press('ArrowDown')
 console.log('after ↓↓         :', activeName(), '| floor:', activeGroup())
@@ -692,18 +874,28 @@ await press('ArrowUp')
 console.log('after ↑          :', activeName())
 if (activeName() !== 'DeepSeek Reasoner') throw new Error('ArrowUp did not retreat the cursor')
 await press('End')
-console.log('after End        :', activeName())
-if (activeName() !== 'Qwen3 Max') throw new Error('End did not jump to the last row')
+console.log('after End        :', activeName(), '| last row:', lastModel())
+if (activeName() !== lastModel()) throw new Error('End did not jump to the last row')
 await press('ArrowDown')
-if (activeName() !== 'Qwen3 Max') throw new Error('the cursor ran past the last row')
+if (activeName() !== lastModel()) throw new Error('the cursor ran past the last row')
 await press('Home')
 console.log('after Home       :', activeName())
 if (activeName() !== 'DeepSeek Reasoner (modlens vision)') throw new Error('Home did not jump to the first row')
 await press('ArrowUp')
 if (activeName() !== 'DeepSeek Reasoner (modlens vision)') throw new Error('the cursor ran past the first row')
+// PageDown is a page, not the end of the list: from the first row it steps down
+// by the page size (ten) and clamps, so on a list this short it lands on the
+// last row — and further pages then hold there.
+const pageSize = 10
+const rowCount = modelNames().length
+const expectedAfterPage = modelNames()[Math.min(pageSize, rowCount - 1)]
 await press('PageDown')
-console.log('after PageDown   :', activeName())
-if (activeName() !== 'Qwen3 Max') throw new Error('PageDown did not land on the last row')
+console.log('after PageDown   :', activeName(), `| rows: ${rowCount}`)
+if (activeName() !== expectedAfterPage) {
+  throw new Error(`PageDown must step ${pageSize} rows, expected "${expectedAfterPage}"`)
+}
+for (let extra = 0; extra < 3; extra += 1) await press('PageDown')
+if (activeName() !== lastModel()) throw new Error('PageDown did not hold on the last row')
 await press('Home')
 // Typing keeps working after arrow navigation: focus never left the input.
 await act(async () => { typeInto(searchNow(), 'reasoner') })

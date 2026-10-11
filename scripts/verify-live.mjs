@@ -140,6 +140,63 @@ if (seat.trigger) {
   console.log(JSON.stringify(open, null, 2))
   if (!open.searchFocused) throw new Error('the popup must open with the caret in the search box')
 
+  // ── The avatar is a brand mark, and it paints ────────────────────────────
+  // The marks are inlined SVG paths filled with `currentColor`, so a real
+  // browser is the only place that can answer the question jsdom cannot: does
+  // the mark have a size, and does it paint in the row's own ink rather than
+  // coming out invisible? The row this reads is the live model's, which is what
+  // the closed trigger wears.
+  const avatar = await page.evaluate(() => {
+    const option = document.querySelector('.dsh-mp2-list .dsh-mp2-option')
+    const chip = option?.querySelector('.dsh-mp2-avatar')
+    const svg = chip?.querySelector('svg')
+    const path = svg?.querySelector('path')
+    if (chip === null || chip === undefined || svg == null || path == null) {
+      return { present: false, model: option?.querySelector('.dsh-mp2-modelName')?.textContent ?? null }
+    }
+    const chipBox = chip.getBoundingClientRect()
+    const svgBox = svg.getBoundingClientRect()
+    const chipStyle = getComputedStyle(chip)
+    const svgStyle = getComputedStyle(svg)
+    return {
+      present: true,
+      model: option.querySelector('.dsh-mp2-modelName').textContent,
+      brand: chip.classList.contains('dsh-mp2-avatarBrand'),
+      letter: chip.textContent,
+      chipBackground: chipStyle.backgroundColor,
+      svgFill: svgStyle.fill,
+      svgBoxShadow: svgStyle.boxShadow,
+      pathLength: path.getAttribute('d')?.length ?? 0,
+      fillRule: svg.getAttribute('fill-rule') ?? svgStyle.fillRule,
+      chipSize: [Math.round(chipBox.width), Math.round(chipBox.height)],
+      svgSize: [Math.round(svgBox.width), Math.round(svgBox.height)],
+    }
+  })
+  console.log('--- row avatar ---')
+  console.log(JSON.stringify(avatar, null, 2))
+  if (!avatar.present) throw new Error('a model row rendered no avatar at all')
+  if (avatar.brand) {
+    if (avatar.pathLength === 0) throw new Error('the brand mark carried an empty path')
+    if (avatar.letter !== '') throw new Error(`a brand mark also rendered a letter: ${JSON.stringify(avatar.letter)}`)
+    if (avatar.chipBackground !== 'rgba(0, 0, 0, 0)') {
+      throw new Error(`a brand mark must not wear the fallback chip tint: ${avatar.chipBackground}`)
+    }
+    if (avatar.svgSize[0] === 0 || avatar.svgSize[1] === 0) {
+      throw new Error(`the brand mark painted at zero size: ${JSON.stringify(avatar.svgSize)}`)
+    }
+    if (avatar.svgSize[0] > avatar.chipSize[0]) {
+      throw new Error(`the brand mark overflows its box: ${JSON.stringify([avatar.svgSize, avatar.chipSize])}`)
+    }
+    if (avatar.fillRule !== 'evenodd') {
+      throw new Error(`the brand mark dropped its fill-rule and would fill its own counters: ${avatar.fillRule}`)
+    }
+    if (/rgba\(0, 0, 0, 0\)/.test(avatar.svgFill)) {
+      throw new Error(`the brand mark painted in no colour: ${avatar.svgFill}`)
+    }
+  } else if ((avatar.letter ?? '') === '') {
+    throw new Error('a row fell back to a chip with no letter in it')
+  }
+
   // ── The search box carries no focus highlight ────────────────────────────
   // The field is focused for the whole life of the popup, so an accent border
   // would be lit from the moment the panel opens and read as a state to clear;
