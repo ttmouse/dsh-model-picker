@@ -111,6 +111,7 @@ The right column is always one grouped list: **Recent** (`最近使用` in a Chi
 
 - Scrolling the right column highlights the left row for the section pinned at the list's top edge (scroll spy / elevator). The group headers are `position: sticky`, so the left row always matches the header you see.
 - Clicking a left-column supplier jumps the list straight to that group — an instant landing, not an animated ride: the elevator is a table of contents, and the time spent travelling is time nobody asked for. During a search, clicking a supplier **narrows** the results instead (search facet).
+- A group heading is its **label and nothing else**. It used to wear a pictogram (a clock for the history, and one building glyph shared by every supplier *and* the favorites). A building does not read as "supplier", the favorites group has no building in it, and the label already said which group you were in, so the icons were removed.
 
 ## Recent
 
@@ -155,6 +156,18 @@ open, so the panel is where the way to it belongs.
 - The hand-off is read through *this* plugin's own inject set (`slots`, plus the
   optional `shortcuts` service via `ctx.get`), never the caller's, and it can
   never throw into a click handler.
+
+The same row carries one more control: a **sidebar toggle** (the outlined-panel
+glyph) that collapses or expands the shell's left sidebar.
+
+- It does not own any sidebar state. The layout plugin already registers
+  collapsing as a command (`sidebar.left.toggle`, bound to `⌘B`), so the button
+  forwards that command and nothing else. Toggling a class or a width from here
+  would desynchronise the layout from the state it believes it is in.
+- The picker **stays open** across the toggle. Collapsing a sidebar is not a
+  reason to lose the list the user was reading.
+- A carrier without the command (a deployment with no sidebar) leaves the button
+  inert, exactly like the settings row above it.
 
 ## Language
 

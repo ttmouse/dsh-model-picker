@@ -211,7 +211,7 @@ const services = {
   // a carrier's seat carries no store.
   shortcuts: {
     registry: {
-      commands: new Map([['settings.open', {}]]),
+      commands: new Map([['settings.open', {}], ['sidebar.left.toggle', {}]]),
       invoke: (id, context) => { shortcutCalls.push({ id, context }) },
     },
   },
@@ -334,14 +334,14 @@ console.log('providers (all)   :', providerNames())
 console.log('models (all)      :', modelNames())
 
 // 2b. The grouped list puts 收藏 first (mirrored), then every supplier group.
-// Every group heading carries its icon. A folded route's model sits inside its
-// base provider's group, not under its own heading.
+// A heading is its label and nothing else. A folded route's model sits inside
+// its base provider's group, not under its own heading.
 const groupsShown = () => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')].map((g) => ({
-  header: g.querySelector('.dsh-mp2-groupHeaderIcon')?.parentElement?.textContent,
-  icon: g.querySelector('.dsh-mp2-groupHeaderIcon svg') !== null,
+  header: g.querySelector('.dsh-mp2-groupHeader')?.textContent,
+  icon: g.querySelector('.dsh-mp2-groupHeader svg') !== null,
   models: [...g.querySelectorAll('.dsh-mp2-modelName')].map((n) => n.textContent),
 }))
-/** The group DOM node whose heading reads `header` (icons carry no text). */
+/** The group DOM node whose heading reads `header`. */
 const groupEl = (header) => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')]
   .find((g) => g.querySelector('.dsh-mp2-groupHeader')?.textContent === header)
 const grouped = groupsShown()
@@ -352,7 +352,7 @@ console.log('groups            :', JSON.stringify(grouped))
 if (grouped.length !== 5) throw new Error(`expected recent + favorites + 3 provider groups, got ${grouped.length}`)
 if (grouped[0].header !== 'Recent') throw new Error('the history group must be pinned above the favorites')
 if (grouped[1].header !== 'Favorites') throw new Error('the second group must be Favorites')
-if (grouped.some((g) => !g.icon)) throw new Error('a group heading is missing its supplier icon')
+if (grouped.some((g) => g.icon)) throw new Error('a group heading carries an icon again')
 if (!groupByHeader('DeepSeek')?.models.includes('DeepSeek Reasoner (modlens vision)')) {
   throw new Error('a folded model did not land in its base provider group')
 }
@@ -372,11 +372,11 @@ if (JSON.stringify(storedRecent()) !== '["deepseek/deepseek-reasoner"]') {
 if (groupEl('Recent').querySelector('.dsh-mp2-option .dsh-mp2-description')?.textContent !== 'DeepSeek · thinking') {
   throw new Error('a history row must name the route serving it')
 }
-// The heading says "history", not "supplier": it must not wear the building glyph.
-const headerIcon = (header) => groupEl(header)?.querySelector('.dsh-mp2-groupHeaderIcon svg')?.innerHTML
-if (headerIcon('Recent') === headerIcon('DeepSeek')) {
-  throw new Error('the history group wears the supplier heading icon')
-}
+// A heading is a label, not a pictogram. Every group used to wear one: a clock
+// for the history and a single building glyph for the suppliers AND the
+// favorites, neither of which told the reader anything.
+const headingSvgs = () => container.querySelectorAll('.dsh-mp2-list .dsh-mp2-groupHeader svg').length
+if (headingSvgs() !== 0) throw new Error(`a group heading rendered an icon again (${headingSvgs()} svg)`)
 
 // 2c. Every row wears its supplier's leading character ahead of the model name,
 // so the source is legible without reading the group heading back up the list.
@@ -832,6 +832,21 @@ if (!footerButton.textContent.includes('Settings · Models')) {
 if (footerButton.querySelectorAll('svg').length !== 2) {
   throw new Error('the footer wears a settings glyph and a leave-the-panel glyph')
 }
+
+// 11-bis. The sidebar toggle forwards the shell's own command and leaves the
+//        picker open: collapsing the sidebar is no reason to lose the list the
+//        user was reading.
+const footerToggle = () => container.querySelector('.dsh-mp2-footerIcon')
+if (footerToggle() === null) throw new Error('the footer must carry a sidebar toggle')
+if (footerToggle().querySelector('svg') === null) throw new Error('the sidebar toggle must be a vector icon')
+if (!footerToggle().getAttribute('aria-label')) throw new Error('the sidebar toggle must be named for screen readers')
+const callsBeforeToggle = shortcutCalls.length
+await act(async () => { footerToggle().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('sidebar toggle   :', JSON.stringify(shortcutCalls.slice(callsBeforeToggle).map((call) => call.id)))
+if (shortcutCalls.at(-1)?.id !== 'sidebar.left.toggle') {
+  throw new Error("the toggle must run the shell's own sidebar command, not drive the layout itself")
+}
+if (container.querySelector('.dsh-mp2-menu') === null) throw new Error('toggling the sidebar must not close the picker')
 
 // Clicking it writes the 模型 section to the settings shell and closes the
 // popup — and it must never double as a model pick.
