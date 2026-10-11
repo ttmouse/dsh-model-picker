@@ -47,7 +47,12 @@ the list, so a model's source is legible before the picker is ever opened.
 - Every chip is held at the **same lightness and chroma** (OKLCH, hue varies
   only). No supplier shouts louder than another, and no supplier's chip can
   vanish into the panel the way a mid-blue one did under a fixed saturation.
-  Only the chip carries the hue; the panel's one accent stays the check mark on
+- The glyph takes the **surrounding ink** (`color: inherit`), so it is dark on
+  the light theme and light on the dark one (12.35:1 and 6.56:1 measured on
+  painted pixels). A per-hue glyph colour was tried and removed: a light tint of
+  the hue is legible on the dark theme and effectively invisible on the light
+  one, which is the theme nobody checks.
+- Only the tint carries the hue; the panel's one accent stays the check mark on
   the model in use.
 
 ## Provider folding
@@ -233,6 +238,15 @@ something other than a slight change in brightness:
   surface. The panel's single accent is the check mark on the model in use; an
   accent-filled provider row made `--dsw-alias-brand-primary` (which resolves to
   near-white here) fight the glyph for the eye.
+
+Two rules keep a row readable once its hover surface is a filled rounded rect:
+
+- Rows are separated by a **2px gap**, not by their surfaces alone. The surfaces
+  touch edge to edge, so two adjacent highlighted rows used to fuse into one
+  block and read as a single control.
+- A row's detail line shares the **model name's left edge**, not the chip's. The
+  chip is a marker ahead of the name, so both text lines align; the indent is
+  derived from the chip's own size, so it cannot drift away from it.
 
 Motion is one chevron turn at 160ms on a strong ease-out curve, plus colour lifts
 on press and hover. The turn is dropped under `prefers-reduced-motion`; the
