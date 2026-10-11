@@ -1312,6 +1312,7 @@ async function failoverMount(storage, stage) {
     repairState.snapshot = stage.snapshot
     repairState.interrupted = stage.interrupted
     repairState.originalText = stage.originalText ?? null
+    if (stage.promptResult !== undefined) repairState.promptResult = stage.promptResult
   }
   notify()
   const host = document.createElement('div')
@@ -1470,36 +1471,23 @@ for (const [label, storage, stage] of [
   await act(async () => { root.unmount() })
 }
 
-// 13g. A designated fallback that this session no longer lists must not switch to
-//      nothing: the click reports the problem and sends no work.
+// 13g. A stale route is omitted from actionable failover choices.
 {
   const storage = { 'dsh.modelPicker.fallback': JSON.stringify({ route: 'ghost/never-configured' }) }
   const { host, root } = await failoverMount(storage, SEND_FAILURE)
-  const button = buttonOf(host)
-  if (button === null) throw new Error('a live failure must still offer the button')
-  const before = selections.length
-  await act(async () => { button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-  await act(async () => { await Promise.resolve() })
-  console.log('stale route   : switched=%d prompts=%d error=%s',
-    selections.length - before, repairCalls.prompts.length,
-    JSON.stringify(host.querySelector('.dsh-mp2-failoverError')?.textContent ?? null))
-  if (selections.length !== before) throw new Error('a stale fallback must not switch the model')
-  if (repairCalls.prompts.length !== 0) throw new Error('a stale fallback must not send anything')
-  if (host.querySelector('.dsh-mp2-failoverError') === null) {
-    throw new Error('a stale fallback must explain itself')
-  }
+  console.log('stale route   : button=%s', buttonOf(host) === null ? 'hidden' : 'shown')
+  if (buttonOf(host) !== null) throw new Error('a stale fallback must not offer an unusable action')
   await act(async () => { root.unmount() })
 }
 
 // 13h. A rejected submission reports instead of failing silently, and the guard
 //      does not latch: clicking again retries rather than pretending success.
 {
-  const { host, root } = await failoverMount(seedFallback, SEND_FAILURE)
-  repairState.promptResult = { ok: false, error: { message: 'rejected' } }
+  const { host, root } = await failoverMount(seedFallback, { ...SEND_FAILURE, promptResult: { ok: false, error: { message: 'rejected' } } })
   await act(async () => { buttonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
   const shown = host.querySelector('.dsh-mp2-failoverError')?.textContent ?? null
-  console.log('rejected      : error=%s', JSON.stringify(shown))
+  console.log('rejected      : error=%s prompts=%d', JSON.stringify(shown), repairCalls.prompts.length)
   if (shown === null) throw new Error('a rejected repair must not be silent')
   const firstAttempts = repairCalls.prompts.length
   await act(async () => { buttonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
@@ -1559,16 +1547,51 @@ for (const [label, storage, stage] of [
   await act(async () => { pinOf('GLM-4.6').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
   const stored = JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback'))
   console.log('designate     : stored=%s pressed=%s', JSON.stringify(stored), pinOf('GLM-4.6').getAttribute('aria-pressed'))
-  if (stored.route !== 'zhipu/glm-4.6') {
-    throw new Error(`clicking the pin must store the route, got ${JSON.stringify(stored)}`)
+  if (!Array.isArray(stored) || stored[0] !== 'zhipu/glm-4.6') {
+    throw new Error(`clicking the pin must append the route to the ordered queue, got ${JSON.stringify(stored)}`)
   }
   if (pinOf('GLM-4.6').getAttribute('aria-pressed') !== 'true') {
-    throw new Error('the designated row must show its pin as pressed')
+    throw new Error('a queued fallback must show its pin as pressed')
   }
   await act(async () => { pinOf('GLM-4.6').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
   const cleared = JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback'))
-  console.log('clear         : stored=%s', JSON.stringify(cleared))
-  if (cleared.route !== null) throw new Error(`a second click must clear the fallback, got ${JSON.stringify(cleared.route)}`)
+  console.log('remove        : stored=%s', JSON.stringify(cleared))
+  if (!Array.isArray(cleared) || cleared.includes('zhipu/glm-4.6')) throw new Error(`removing a route must leave it out of the queue, got ${JSON.stringify(cleared)}`)
+  await act(async () => { root.unmount() })
+}
+
+// 13k.1. Search the dedicated page, add multiple candidates, and reorder priority.
+{
+  const { host, root } = await failoverMount({}, CLEAN)
+  await act(async () => { host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  await act(async () => { host.querySelector('.dsh-mp2-fallbackManage').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  const search = host.querySelector('.dsh-mp2-fallbackPage input[type="search"]')
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set
+    setter.call(search, 'GLM-4.6')
+    search.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    search.dispatchEvent(new dom.window.Event('change', { bubbles: true }))
+  })
+  const glm = [...host.querySelectorAll('.dsh-mp2-fallbackCandidate')].find((node) => node.textContent.includes('GLM-4.6'))
+  if (glm === undefined) throw new Error('fallback search must find GLM-4.6')
+  await act(async () => { glm.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  const queryInput = host.querySelector('.dsh-mp2-fallbackPage input[type="search"]')
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set
+    setter.call(queryInput, 'Qwen3 Max')
+    queryInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    queryInput.dispatchEvent(new dom.window.Event('change', { bubbles: true }))
+  })
+  const qwen = [...host.querySelectorAll('.dsh-mp2-fallbackCandidate')].find((node) => node.textContent.includes('Qwen3 Max'))
+  if (qwen === undefined) throw new Error('fallback search must find Qwen3 Max')
+  await act(async () => { qwen.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  const firstDown = host.querySelector('.dsh-mp2-fallbackRow button[title="Move down"]')
+  await act(async () => { firstDown.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  const ordered = JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback'))
+  console.log('manage page   : ordered=%s', JSON.stringify(ordered))
+  if (JSON.stringify(ordered) !== JSON.stringify(['17an/qwen3-max', 'zhipu/glm-4.6'])) {
+    throw new Error(`search, add, and reorder must persist priority order, got ${JSON.stringify(ordered)}`)
+  }
   await act(async () => { root.unmount() })
 }
 
@@ -1580,6 +1603,177 @@ for (const [label, storage, stage] of [
   console.log('legacy record : %s', buttonOf(host) === null ? 'no button' : 'button shown')
   if (buttonOf(host) === null) {
     throw new Error('a legacy {route, enabled} record must still designate the fallback')
+  }
+  await act(async () => { root.unmount() })
+}
+
+// ── The automatic path ──────────────────────────────────────────────────────
+//
+// The Host retries a failed request five times on the SAME model and only then
+// throws. `lastAgentError` is raised by that throw and never during the retries,
+// so the failure store reporting an `error` IS the signal that the budget is
+// spent — no separate retry accounting exists or is needed. These cases drive
+// that moment and check what the panel does without being asked.
+
+/**
+ * Mount onto a healthy session, then report a failure the way the Host does
+ * mid-turn. This is the only shape the automatic path is allowed to act on: the
+ * seat has to have read the session as healthy first, which is what separates a
+ * turn that just broke from a failure found already in the log.
+ */
+async function liveMount(storage, stage) {
+  const { host, root } = await failoverMount(storage, CLEAN)
+  repairState.snapshot = stage.snapshot
+  repairState.interrupted = stage.interrupted
+  repairState.originalText = stage.originalText ?? null
+  await act(async () => { sessionNotify(); await Promise.resolve() })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  return { host, root }
+}
+
+/** Report the same shape of failure again, after the session has healed. */
+async function healThen(stage) {
+  repairState.snapshot = { promptError: null, lastAgentError: null, promptAttempted: true }
+  repairState.interrupted = undefined
+  await act(async () => { sessionNotify(); await Promise.resolve() })
+  repairState.snapshot = stage.snapshot
+  repairState.interrupted = stage.interrupted
+  repairState.originalText = stage.originalText ?? null
+  await act(async () => { sessionNotify(); await Promise.resolve() })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+}
+
+const noteOf = (host) => host.querySelector('.dsh-mp2-autoNote')
+
+// 13m. The case this feature exists for: the Host's retries are spent, a fallback
+//      is designated, and the turn resumes on the new model with no user action.
+//      The switch is announced, because the next prompt runs on a model the user
+//      never chose, and the announcement REPLACES the button — offering the same
+//      repair again right after performing it would be asking twice.
+{
+  const before = selections.length
+  const { host, root } = await liveMount(seedFallback, AGENT_FAILURE)
+  const note = noteOf(host)
+  const picked = selections.slice(before)
+  console.log('auto switch   : note=%s switched=%s prompts=%d',
+    note === null ? 'NONE' : JSON.stringify(note.textContent),
+    JSON.stringify(picked.at(-1) ?? null), repairCalls.prompts.length)
+  if (note === null) {
+    throw new Error('an exhausted turn with a fallback designated must announce the automatic switch')
+  }
+  if (!/GLM-4.6/.test(note.textContent)) {
+    throw new Error(`the announcement must name the model now in use, got ${JSON.stringify(note.textContent)}`)
+  }
+  if (picked.length !== 1 || picked[0].provider !== 'zhipu' || picked[0].model !== 'glm-4.6') {
+    throw new Error(`the automatic path must switch to the fallback, got ${JSON.stringify(picked)}`)
+  }
+  if (repairCalls.prompts.length !== 1) {
+    throw new Error(`the automatic path must send exactly one repair, got ${repairCalls.prompts.length}`)
+  }
+  if (repairCalls.prompts[0].mode !== 'queue') {
+    throw new Error(`the automatic repair must queue, got mode ${repairCalls.prompts[0].mode}`)
+  }
+  if (buttonOf(host) !== null) {
+    throw new Error('the announcement must replace the repair button, not sit beside it')
+  }
+  if (note.querySelector('button') !== null) {
+    throw new Error('the announcement is a report, not a control — it must hold no interactive element')
+  }
+  await act(async () => { root.unmount() })
+}
+
+// 13n. A failure already in the log when the seat attaches is NOT a turn that
+//      just broke: it is history being opened, or a page reloaded mid-failure.
+//      Escalating there would swap the model and inject a prompt into a
+//      conversation nobody had just run. The manual button still appears, since
+//      a person looking at the failure can decide for themselves.
+{
+  const before = selections.length
+  const { host, root } = await failoverMount(seedFallback, AGENT_FAILURE)
+  console.log('pre-existing  : note=%s button=%s switched=%d',
+    noteOf(host) === null ? 'none' : 'SHOWN',
+    buttonOf(host) === null ? 'none' : 'shown',
+    selections.length - before)
+  if (noteOf(host) !== null) throw new Error('a failure found at attach must not auto-escalate')
+  if (selections.length !== before) throw new Error('a failure found at attach must not switch the model')
+  if (repairCalls.prompts.length !== 0) throw new Error('a failure found at attach must not send anything')
+  if (buttonOf(host) === null) throw new Error('a failure found at attach must still offer the manual repair')
+  await act(async () => { root.unmount() })
+}
+
+// 13o. A user pressing stop is not a failure. The turn is marked interrupted with
+//      no error, and re-sending it would fight the person who asked it to stop.
+{
+  const before = selections.length
+  const { host, root } = await liveMount(seedFallback, {
+    snapshot: { promptError: null, lastAgentError: null, promptAttempted: true },
+    interrupted: true,
+    originalText: null,
+  })
+  console.log('user stop     : note=%s switched=%d prompts=%d',
+    noteOf(host) === null ? 'none' : 'SHOWN', selections.length - before, repairCalls.prompts.length)
+  if (noteOf(host) !== null) throw new Error('a user stop must never auto-escalate')
+  if (selections.length !== before) throw new Error('a user stop must never switch the model')
+  if (repairCalls.prompts.length !== 0) throw new Error('a user stop must never send anything')
+  if (buttonOf(host) === null) throw new Error('a user stop must still offer the manual repair')
+  await act(async () => { root.unmount() })
+}
+
+// 13p. Already on the fallback: escalating would switch a model to itself and
+//      then re-trigger on the same failure. This is what stops a fallback that
+//      is itself failing from looping.
+{
+  const before = selections.length
+  const { host, root } = await failoverMount(seedFallback, CLEAN)
+  await act(async () => {
+    snapshot.current = { provider: 'zhipu', model: 'glm-4.6', reasoningEffort: 'high' }
+    notify()
+    await Promise.resolve()
+  })
+  repairState.snapshot = AGENT_FAILURE.snapshot
+  repairState.interrupted = AGENT_FAILURE.interrupted
+  repairState.originalText = AGENT_FAILURE.originalText
+  await act(async () => { sessionNotify(); await Promise.resolve() })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  console.log('on fallback   : note=%s switched=%d', noteOf(host) === null ? 'none' : 'SHOWN', selections.length - before)
+  if (noteOf(host) !== null) throw new Error('a failure on the fallback itself must not escalate')
+  if (selections.length !== before) throw new Error('a failure on the fallback itself must not switch')
+  await act(async () => { root.unmount() })
+}
+
+// 13q. No fallback designated: the panel stays completely passive. An install
+//      that never opted in must not have a model chosen for it.
+{
+  const before = selections.length
+  const { host, root } = await liveMount({}, AGENT_FAILURE)
+  console.log('no fallback   : note=%s switched=%d prompts=%d',
+    noteOf(host) === null ? 'none' : 'SHOWN', selections.length - before, repairCalls.prompts.length)
+  if (noteOf(host) !== null) throw new Error('without a designated fallback nothing may escalate')
+  if (selections.length !== before) throw new Error('without a designated fallback nothing may switch')
+  if (repairCalls.prompts.length !== 0) throw new Error('without a designated fallback nothing may be sent')
+  await act(async () => { root.unmount() })
+}
+
+// 13r. The loop breaker is per-failure, not per-session. A failure that clears
+//      must reopen the automatic path, or the first failure of a session would
+//      be the only one ever rescued.
+{
+  const before = selections.length
+  const { host, root } = await liveMount(seedFallback, AGENT_FAILURE)
+  const afterFirst = selections.length
+  if (afterFirst - before !== 1) throw new Error('precondition: the first failure must escalate')
+  await act(async () => {
+    snapshot.current = { provider: 'deepseek', model: 'deepseek-reasoner', reasoningEffort: 'high' }
+    notify()
+    await Promise.resolve()
+  })
+  await healThen({ snapshot: { promptError: null, lastAgentError: 'stream ended unexpectedly', promptAttempted: true }, interrupted: undefined, originalText: '再看一遍' })
+  console.log('second failure: switched=%d prompts=%d', selections.length - before, repairCalls.prompts.length)
+  if (selections.length - before !== 2) {
+    throw new Error(`a failure after the session healed must escalate again, got ${selections.length - before} switches`)
+  }
+  if (repairCalls.prompts.length !== 2) {
+    throw new Error(`the second failure must send its own repair, got ${repairCalls.prompts.length}`)
   }
   await act(async () => { root.unmount() })
 }

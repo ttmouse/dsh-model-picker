@@ -222,6 +222,20 @@ extra bookkeeping to keep the two in step. Clicking repairs once; a rejected
 submission says so and stays retryable rather than latching as done. Everything
 is submitted with mode `queue`, so a repair never interrupts a live turn.
 
+**Retries exhausted → it escalates without being asked.** The Host retries a
+failed request five times on the **same** model and only reports
+`lastAgentError` once that budget is spent, so a Host-raised error already means
+"retrying this route is futile". At that point the panel switches to the first
+designated fallback that is not the model that just failed, sends the same
+repair, and says which model it moved to. Four guards keep that from being
+reckless: a user pressing stop never escalates (an interrupted turn is not an
+error, and re-sending it would fight the cancel); an install with no fallback
+designated stays completely passive; a failure already in the log when the panel
+attaches is history being opened, not a turn that just broke; and a failure that
+is already on the fallback, or that has already been escalated for, is left to
+the user. The announcement is a report rather than a button — the repair is
+already running — and it retires itself after a few seconds.
+
 Best-effort throughout: an unreachable session, a released reference, or a stale
 fallback route that this session no longer lists leaves the rest of the picker
 working and reports why, rather than sending the work nowhere.
@@ -418,7 +432,14 @@ colour changes stay, because they aid comprehension rather than being motion.
   switching to nothing, a rejected submission is reported and stays retryable
   rather than latching as done, the designation persists and clears on a second
   click, a legacy `{route, enabled}` record still yields its route, and an
-  unreachable session leaves the picker listing models normally.
+  unreachable session leaves the picker listing models normally. The automatic
+  escalation is asserted on the same axis: a watched failure escalates, switches,
+  queues one repair and announces the new model **in place of** the button; a
+  failure found already in the log at attach, a user stop, and a failure with no
+  fallback designated each escalate nothing; a failure on the fallback itself
+  does not switch to itself; and a second failure after the session healed
+  escalates again, which is what keeps the loop breaker per-failure rather than
+  per-session.
 - `scripts/host-route.mjs` drives the real route handler with a stub `llm`:
   asserts the row shape, that a throwing provider/model is isolated, and that
   the 30s cache answers without re-listing.
