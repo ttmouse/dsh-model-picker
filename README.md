@@ -175,27 +175,27 @@ Every model row carries a `☆` / `★` toggle **after the model name**, and aft
 - Favorites are keyed on the **route** (`provider/modelId`), not the bare model id: one model id is routinely served by several configured providers, and favoriting one route says nothing about the others.
 - They live in `localStorage` under `dsh.modelPicker.favorites`, the same place the shipped conversation plugin keeps its own view and width preferences. A storage refusal (private mode, full quota) is swallowed: the in-memory set still tracks the page.
 
-## Failover (switch to repair)
+## Failover (one click to recover a failed turn)
 
 The scenario: a turn dies — the route ran out of quota, got rate limited, or the
-Agent failed partway through — and the user has to switch to a model that still
-works, then retype "continue". The switch is the moment that retype can be
-removed, so the picker turns the switch itself into the repair.
+Agent failed partway through — and the user has to pick a model that still works
+and then retype "continue". That retyping is what this removes.
 
-**Designating a fallback.** Every model row carries a second mark next to the
-star — a wrench — which sets that route as **the fallback**. One route at a
-time; clicking the marked row again clears it. It follows the star's rules
-exactly: reserved space, revealed on hover or keyboard focus, and always visible
-once set, because a state you cannot see is a state you cannot trust. It persists
-in `localStorage` under `dsh.modelPicker.fallback` as `{route, enabled}`.
+**The design rule is visibility.** This is a rare event, so it must not touch
+ordinary model switching at all. Nothing is rendered on a healthy session: there
+is no standing toggle to arm, no per-row mark, no menu entry. Instead a small
+button appears beside the composer **only while a failure is live**, and only
+when a fallback model has been designated. With either half missing the control
+does not exist — so "no fallback set" means no button, never a button that cannot
+act.
 
-**Arming the repair.** The footer carries a wrench toggle. It is **off by
-default**: an automatic resend is an action taken on the user's behalf, and that
-has to be opted into. Turning it on with no fallback designated says so instead
-of arming a switch that could never fire.
+**One click does both halves.** The button switches to the fallback model and
+then sends the repair. The switch is committed first and awaited, because sending
+the repair on the old model would repair in exactly the place that just failed;
+if the switch does not take, nothing is sent.
 
-**Two failure shapes, two different repairs.** This is the part that matters.
-They are told apart using the session's own public snapshot:
+**Two failure shapes, two different repairs.** They are told apart using the
+session's own public snapshot, and the button labels itself accordingly:
 
 | Failure | Signal | Repair |
 | --- | --- | --- |
@@ -209,22 +209,23 @@ re-sending the request reads as a fresh instruction and risks redoing finished
 work — that repair instead tells the model to inspect the current state first.
 A bare "continue" is deliberately never used, because it reads as new input.
 
-**Gating.** A repair fires only when all three hold: the repair is armed, the
-route just picked is the designated fallback, and the session actually failed. A
-clean session, a disarmed toggle, and a switch to any other model all send
-nothing. The same failure is repaired **once**, not once per switch — toggling
-away and back does not resubmit it. Everything is submitted with mode `queue`, so
-a repair never interrupts a live turn.
+**Designating the fallback.** Every model row carries a mark next to the star
+which sets that route as the fallback; one route at a time, and clicking the
+marked row again clears it. It follows the star's rules: reserved space, revealed
+on hover or keyboard focus, always visible once set. It persists in
+`localStorage` under `dsh.modelPicker.fallback`.
 
-The repair is best-effort throughout: an unreachable session, a released
-reference, or a rejected submission leaves the switch itself working and reports
-nothing rather than breaking the picker around it.
+**It retires itself.** The failure state is read through the Session's own
+`subscribe`/`getSnapshot` pair, so the button appears the moment the Host reports
+a failure and disappears the moment `prompt()` clears it — no polling, and no
+extra bookkeeping to keep the two in step. Clicking repairs once; a rejected
+submission says so and stays retryable rather than latching as done. Everything
+is submitted with mode `queue`, so a repair never interrupts a live turn.
 
-**It reports what it did.** The switch that triggers a repair also closes the
-popup, so the report is rendered *outside* it, in the trigger row (and is
-dismissible). An automatic resend with no visible acknowledgement is
-indistinguishable from one that never happened — the user would retype
-"continue" exactly as before.
+Best-effort throughout: an unreachable session, a released reference, or a stale
+fallback route that this session no longer lists leaves the rest of the picker
+working and reports why, rather than sending the work nowhere.
+
 
 ## Configure official models
 
@@ -404,16 +405,20 @@ colour changes stay, because they aid comprehension rather than being motion.
   must follow the app's declaration, an open panel must re-render when it
   changes, the `locale` service must outrank the document attribute, and a render
   that arrives with no locale source at all must still follow the document.
-  Failover is asserted on both the positive and the negative side, because an
-  unasked-for resend is the failure mode that matters: a send failure replays the
-  original words and an agent failure sends the resumption instruction instead, an
-  interrupted final message counts as a failure, and a clean session, a disarmed
-  toggle and a switch to a non-fallback route all send nothing. It also pins the
-  parts that are easy to lose: the report is rendered **outside** the popup (a
-  successful switch closes it, so a report inside would never paint), the
-  designated row shows its mark and clears on a second click, turning the toggle
-  on with no fallback explains itself, the same failure is not resubmitted after a
-  round trip, and an unreachable session leaves the switch itself working.
+  Failover is asserted on both sides, and the negative side carries the most
+  weight because the whole point is that a rare failure must not disturb ordinary
+  switching: a clean session renders **no button at all** (with and without a
+  fallback set), and a live failure with no fallback set renders none either. On
+  the positive side one click must both switch to the fallback and send the
+  repair, in that order; a send failure replays the original words while an agent
+  failure sends the resumption instruction under a different label; a final
+  interrupted message counts as a failure; and the button **retires itself** once
+  the failure clears, which is the behaviour that keeps it out of the way without
+  any extra bookkeeping. Also pinned: a stale fallback route reports instead of
+  switching to nothing, a rejected submission is reported and stays retryable
+  rather than latching as done, the designation persists and clears on a second
+  click, a legacy `{route, enabled}` record still yields its route, and an
+  unreachable session leaves the picker listing models normally.
 - `scripts/host-route.mjs` drives the real route handler with a stub `llm`:
   asserts the row shape, that a throwing provider/model is isolated, and that
   the 30s cache answers without re-listing.
