@@ -175,6 +175,57 @@ Every model row carries a `☆` / `★` toggle **after the model name**, and aft
 - Favorites are keyed on the **route** (`provider/modelId`), not the bare model id: one model id is routinely served by several configured providers, and favoriting one route says nothing about the others.
 - They live in `localStorage` under `dsh.modelPicker.favorites`, the same place the shipped conversation plugin keeps its own view and width preferences. A storage refusal (private mode, full quota) is swallowed: the in-memory set still tracks the page.
 
+## Failover (switch to repair)
+
+The scenario: a turn dies — the route ran out of quota, got rate limited, or the
+Agent failed partway through — and the user has to switch to a model that still
+works, then retype "continue". The switch is the moment that retype can be
+removed, so the picker turns the switch itself into the repair.
+
+**Designating a fallback.** Every model row carries a second mark next to the
+star — a wrench — which sets that route as **the fallback**. One route at a
+time; clicking the marked row again clears it. It follows the star's rules
+exactly: reserved space, revealed on hover or keyboard focus, and always visible
+once set, because a state you cannot see is a state you cannot trust. It persists
+in `localStorage` under `dsh.modelPicker.fallback` as `{route, enabled}`.
+
+**Arming the repair.** The footer carries a wrench toggle. It is **off by
+default**: an automatic resend is an action taken on the user's behalf, and that
+has to be opted into. Turning it on with no fallback designated says so instead
+of arming a switch that could never fire.
+
+**Two failure shapes, two different repairs.** This is the part that matters.
+They are told apart using the session's own public snapshot:
+
+| Failure | Signal | Repair |
+| --- | --- | --- |
+| **Send** — the prompt never left the client | `promptError.op === 'send'` | the **original words are replayed verbatim**, read back from the session log |
+| **Agent** — accepted, then failed or was interrupted mid-turn | `lastAgentError`, or a final `assistant/message` with `interrupted === true` | a **resumption instruction**: check what actually completed, then continue |
+
+Collapsing these into one "continue" would be wrong in the case that matters. A
+send failure left nothing behind, so re-sending the same request is exactly
+right. An agent failure may have left tools half-run and files half-written, so
+re-sending the request reads as a fresh instruction and risks redoing finished
+work — that repair instead tells the model to inspect the current state first.
+A bare "continue" is deliberately never used, because it reads as new input.
+
+**Gating.** A repair fires only when all three hold: the repair is armed, the
+route just picked is the designated fallback, and the session actually failed. A
+clean session, a disarmed toggle, and a switch to any other model all send
+nothing. The same failure is repaired **once**, not once per switch — toggling
+away and back does not resubmit it. Everything is submitted with mode `queue`, so
+a repair never interrupts a live turn.
+
+The repair is best-effort throughout: an unreachable session, a released
+reference, or a rejected submission leaves the switch itself working and reports
+nothing rather than breaking the picker around it.
+
+**It reports what it did.** The switch that triggers a repair also closes the
+popup, so the report is rendered *outside* it, in the trigger row (and is
+dismissible). An automatic resend with no visible acknowledgement is
+indistinguishable from one that never happened — the user would retype
+"continue" exactly as before.
+
 ## Configure official models
 
 The popup carries one fixed row under its body: **Configure official models →
@@ -353,6 +404,16 @@ colour changes stay, because they aid comprehension rather than being motion.
   must follow the app's declaration, an open panel must re-render when it
   changes, the `locale` service must outrank the document attribute, and a render
   that arrives with no locale source at all must still follow the document.
+  Failover is asserted on both the positive and the negative side, because an
+  unasked-for resend is the failure mode that matters: a send failure replays the
+  original words and an agent failure sends the resumption instruction instead, an
+  interrupted final message counts as a failure, and a clean session, a disarmed
+  toggle and a switch to a non-fallback route all send nothing. It also pins the
+  parts that are easy to lose: the report is rendered **outside** the popup (a
+  successful switch closes it, so a report inside would never paint), the
+  designated row shows its mark and clears on a second click, turning the toggle
+  on with no fallback explains itself, the same failure is not resubmitted after a
+  round trip, and an unreachable session leaves the switch itself working.
 - `scripts/host-route.mjs` drives the real route handler with a stub `llm`:
   asserts the row shape, that a throwing provider/model is isolated, and that
   the 30s cache answers without re-listing.
