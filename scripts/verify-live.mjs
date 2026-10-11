@@ -321,7 +321,7 @@ if (seat.trigger) {
   if (!footer.present) throw new Error('the model popup carries no settings footer')
   if (footer.insideList) throw new Error('the footer scrolls with the list instead of sitting under it')
   if (footer.parent !== 'dsh-mp2-menu') throw new Error(`the footer is not a direct child of the popup: ${footer.parent}`)
-  if (footer.svgs !== 2) throw new Error(`the footer must be drawn with vector icons, got ${footer.svgs} svg`)
+  if (footer.svgs !== 1) throw new Error(`the footer entry is one glyph and one label, got ${footer.svgs} svg`)
 
   await page.click('.dsh-mp2-footerAction')
   await page.waitForTimeout(1200)

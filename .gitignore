@@ -3,3 +3,6 @@ node_modules/
 # Probe byproducts. `screenshot.png` is the README image and is tracked;
 # everything else these scripts drop is regenerated on demand.
 live-*.png
+
+# Plugin-runtime state written by the harness, not by this repo.
+.dsh/
