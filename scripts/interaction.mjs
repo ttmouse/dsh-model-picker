@@ -833,20 +833,30 @@ if (footerButton.querySelectorAll('svg').length !== 2) {
   throw new Error('the footer wears a settings glyph and a leave-the-panel glyph')
 }
 
-// 11-bis. The sidebar toggle forwards the shell's own command and leaves the
-//        picker open: collapsing the sidebar is no reason to lose the list the
-//        user was reading.
+// 11-bis. The footer's other control folds the panel's OWN provider column, the
+//        table of contents, so the model list gets that width back. The fold is
+//        a view preference and survives a reload; it must never reach into the
+//        shell's layout, which owns a different sidebar entirely.
+const folded = () => container.querySelector('.dsh-mp2-menu').className.includes('dsh-mp2-menuFolded')
 const footerToggle = () => container.querySelector('.dsh-mp2-footerIcon')
-if (footerToggle() === null) throw new Error('the footer must carry a sidebar toggle')
-if (footerToggle().querySelector('svg') === null) throw new Error('the sidebar toggle must be a vector icon')
-if (!footerToggle().getAttribute('aria-label')) throw new Error('the sidebar toggle must be named for screen readers')
+if (footerToggle() === null) throw new Error('the footer must carry a provider-column toggle')
+if (footerToggle().querySelector('svg') === null) throw new Error('the provider toggle must be a vector icon')
+if (!footerToggle().getAttribute('aria-label')) throw new Error('the provider toggle must be named for screen readers')
+if (folded()) throw new Error('the provider column must start visible')
 const callsBeforeToggle = shortcutCalls.length
 await act(async () => { footerToggle().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-console.log('sidebar toggle   :', JSON.stringify(shortcutCalls.slice(callsBeforeToggle).map((call) => call.id)))
-if (shortcutCalls.at(-1)?.id !== 'sidebar.left.toggle') {
-  throw new Error("the toggle must run the shell's own sidebar command, not drive the layout itself")
+console.log('providers folded :', folded(), '| stored:', localStorage.getItem('dsh.modelPicker.providersHidden'))
+if (!folded()) throw new Error('the toggle must fold the provider column away')
+if (shortcutCalls.length !== callsBeforeToggle) {
+  throw new Error('the provider toggle must not touch the shell layout')
 }
-if (container.querySelector('.dsh-mp2-menu') === null) throw new Error('toggling the sidebar must not close the picker')
+if (localStorage.getItem('dsh.modelPicker.providersHidden') !== '1') {
+  throw new Error('the fold must be remembered as a view preference')
+}
+await act(async () => { footerToggle().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+console.log('providers back   :', !folded(), '| stored:', localStorage.getItem('dsh.modelPicker.providersHidden'))
+if (folded()) throw new Error('the toggle must unfold the column again')
+if (container.querySelector('.dsh-mp2-menu') === null) throw new Error('folding the column must not close the picker')
 
 // Clicking it writes the 模型 section to the settings shell and closes the
 // popup — and it must never double as a model pick.

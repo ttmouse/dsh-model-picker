@@ -157,17 +157,22 @@ open, so the panel is where the way to it belongs.
   optional `shortcuts` service via `ctx.get`), never the caller's, and it can
   never throw into a click handler.
 
-The same row carries one more control: a **sidebar toggle** (the outlined-panel
-glyph) that collapses or expands the shell's left sidebar.
+The same row carries one more control: a **provider-column toggle** (the
+outlined-panel glyph) that folds this panel's own left column away and back.
 
-- It does not own any sidebar state. The layout plugin already registers
-  collapsing as a command (`sidebar.left.toggle`, bound to `⌘B`), so the button
-  forwards that command and nothing else. Toggling a class or a width from here
-  would desynchronise the layout from the state it believes it is in.
-- The picker **stays open** across the toggle. Collapsing a sidebar is not a
-  reason to lose the list the user was reading.
-- A carrier without the command (a deployment with no sidebar) leaves the button
-  inert, exactly like the settings row above it.
+- It folds **this popup's** provider list, which is the panel's table of
+  contents. It is not the application's sidebar: that one belongs to the layout
+  plugin, and this column belongs to the picker.
+- Folded, the **popup narrows by the column it gave up** (measured: 550px to
+  362px), anchored to the same right edge. The model list keeps the width it had
+  rather than stretching into the space: a column that folds should remove
+  space, not redistribute it, and it is the reading width of the list that
+  should not change. The divider that separated the two columns leaves with the
+  column it belonged to.
+- The fold is a **view preference**, remembered in `localStorage` under
+  `dsh.modelPicker.providersHidden`, the way the favorites and the history are.
+  It is not folded by default: the column is the panel's map, and a map the user
+  never asked to lose should be there on the first open.
 
 ## Language
 
