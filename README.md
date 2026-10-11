@@ -23,6 +23,14 @@ the name alone does not say where the model runs. The supplier named is the
 **display** one, so a selection on a folded `(modlens vision)` route still reads
 as its base provider — the same name the user clicked in the column.
 
+The panel is 540px wide and up to 500px tall, and both give way under pressure
+rather than overflowing. Its height is clamped against the measured space above
+the trigger (which is `50vh + 61px` in the hero layout, checked at six window
+heights), minus the panel's own chrome: at a 900px-tall window the panel measures
+exactly 500px and keeps an 11px margin from the top edge. When the provider
+column folds, the panel gives up that column's width instead of stretching the
+model list (see **Configure official models**).
+
 ## Supplier chip
 
 The supplier's leading character rides ahead of the model name — `D` for
@@ -31,9 +39,10 @@ the list, so a model's source is legible before the picker is ever opened.
 
 - The trigger's `max-width` (300px) leaves room for the chip's footprint (16px
   plus its gap) on top of the name budget, so wearing the chip costs the model
-  name no characters. The effort zone is the part that yields when the composer
-  row runs short: it shrinks and then ellipsises its label, because the model
-  name is the primary information and the effort level is the secondary one.
+  name no characters. When the composer row runs short it is the model
+  NAME that truncates, never the effort zone: the effort zone reports a state in
+  one short word, and a clipped state word is a different string ("Hi..."), while
+  a name is free-form, truncates readably, and the tooltip carries it in full.
 - The chip names the **display** supplier, so a row served by a folded
   `(modlens vision)` route wears its base provider's chip rather than one of its
   own.
@@ -86,8 +95,10 @@ GET /api/model-picker/models
 - One row per provider/model is isolated: a provider or model that throws is
   dropped, and a row carrying neither fact is omitted entirely.
 - The snapshot is cached for 30s — the route never fans out per keystroke.
-- The popup badges each row with a context chip (`1M`, `384K`) and an image
-  glyph, joined on `provider/modelId`.
+- The popup badges each row with an image glyph, which rides **after the model
+  name** because input modality is a property of the model, and with a context
+  chip (`1M`, `384K`) in the trailing strip, where the numbers line up as a
+  column you can compare down. Both are joined on `provider/modelId`.
 - **Vision.** A plain glyph means the model reads pixels itself. A glyph with a
   slash across it means the route accepts images only because modlens bridges
   them: the model still cannot see — modlens transcribes the image to text
@@ -111,6 +122,7 @@ The right column is always one grouped list: **Recent** (`最近使用` in a Chi
 
 - Scrolling the right column highlights the left row for the section pinned at the list's top edge (scroll spy / elevator). The group headers are `position: sticky`, so the left row always matches the header you see.
 - Clicking a left-column supplier jumps the list straight to that group — an instant landing, not an animated ride: the elevator is a table of contents, and the time spent travelling is time nobody asked for. During a search, clicking a supplier **narrows** the results instead (search facet).
+- Groups are separated by their sticky heading alone. A hairline rule per group was drawn across the list every few rows and earned nothing, so there is none.
 - A group heading is its **label and nothing else**. It used to wear a pictogram (a clock for the history, and one building glyph shared by every supplier *and* the favorites). A building does not read as "supplier", the favorites group has no building in it, and the label already said which group you were in, so the icons were removed.
 
 ## Recent
@@ -120,11 +132,14 @@ The panel opens on the models used lately, with **the route in use at the front*
 - What is recorded is **the current route the directory reports**, not the rows clicked in this popup: a switch made in this list, in the shipped `/model` popup, or by a session reopening on its own model all count as "used" — the history answers "what have I been using", not "what did I click in this panel".
 - Keyed on the **route** (`provider/modelId`), deduplicated and fixed-length (6 entries): reusing a route only moves it to the front instead of taking a second slot.
 - It lives in `localStorage` under `dsh.modelPicker.recent`, with the same conventions as the favorites. A route that is no longer configured (provider uninstalled, model retired) stays in storage but is **not rendered**: the record comes back with the provider, and the list never shows a model that is not there.
-- An empty history shows neither the group nor its floor — a favorites group teaches that starring exists, a history has nothing to teach, so a first run looks exactly like the picker without one.
+- An empty history shows neither the group nor its floor, and an empty favorites group does the same: a heading with nothing under it is a promise the panel cannot keep. The favorites floor goes with its group, since a floor that jumps to a section which is not rendered would scroll the list nowhere. Starring one model brings both back.
 
 ## Favorites
 
-Every model row carries a `☆` / `★` toggle between the name and the fact strip. The row is itself a `<button>`, so the star stops its click from reaching it — favoriting a model must never also pick it — and it handles `Enter` / `Space` on its own.
+Every model row carries a `☆` / `★` toggle **after the model name**, and after the vision mark when there is one, so a row reads as a name followed by its marks: what the model accepts first, then the action you can take on it. The row is itself a `<button>`, so the star stops its click from reaching it — favoriting a model must never also pick it — and it handles `Enter` / `Space` on its own.
+
+- The star is **revealed, not always present**. Favoriting is something you do to a row, not part of what the row says, so the star stays unpainted until the row is hovered or holds keyboard focus. Its box keeps its place either way, so revealing it never shifts the row under the pointer, and only a pointer that can actually hover hides it: on a touch screen it would be permanently unreachable, so there it stays visible.
+- A **favorited** row always shows its star. That star is state rather than an invitation, and hiding it would hide the answer.
 
 - Favorited models appear **twice** in the list: once in their provider's group, and once in the favorites group pinned at the top of the list. A favorites row always names the provider serving it.
 - Favorites are keyed on the **route** (`provider/modelId`), not the bare model id: one model id is routinely served by several configured providers, and favoriting one route says nothing about the others.

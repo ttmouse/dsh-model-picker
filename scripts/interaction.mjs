@@ -335,7 +335,8 @@ console.log('models (all)      :', modelNames())
 
 // 2b. The grouped list puts 收藏 first (mirrored), then every supplier group.
 // A heading is its label and nothing else. A folded route's model sits inside
-// its base provider's group, not under its own heading.
+// its base provider's group, not under its own heading. Nothing is starred yet,
+// so the favorites group is absent rather than rendered empty.
 const groupsShown = () => [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')].map((g) => ({
   header: g.querySelector('.dsh-mp2-groupHeader')?.textContent,
   icon: g.querySelector('.dsh-mp2-groupHeader svg') !== null,
@@ -349,9 +350,15 @@ const groupByHeader = (header) => grouped.find((g) => g.header === header)
 /** The same lookup against the CURRENT list — `grouped` is a snapshot. */
 const liveGroup = (header) => groupsShown().find((g) => g.header === header)
 console.log('groups            :', JSON.stringify(grouped))
-if (grouped.length !== 5) throw new Error(`expected recent + favorites + 3 provider groups, got ${grouped.length}`)
-if (grouped[0].header !== 'Recent') throw new Error('the history group must be pinned above the favorites')
-if (grouped[1].header !== 'Favorites') throw new Error('the second group must be Favorites')
+if (grouped.length !== 4) throw new Error(`expected recent + 3 provider groups, got ${grouped.length}`)
+if (grouped[0].header !== 'Recent') throw new Error('the history group must be pinned at the top')
+// An empty favorites group teaches nothing and would be a heading with nothing
+// under it, so it is not rendered at all — and neither is its left-column
+// floor, which would otherwise scroll to a section that does not exist.
+if (groupByHeader('Favorites') !== undefined) throw new Error('an empty favorites group must not be rendered')
+const leftFloors = () => [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp2-providerName')].map((n) => n.textContent)
+if (leftFloors().includes('Favorites')) throw new Error('an empty favorites group must not leave a floor behind')
+if (grouped[1].header !== 'DeepSeek') throw new Error(`the suppliers must follow the history, got ${grouped[1].header}`)
 if (grouped.some((g) => g.icon)) throw new Error('a group heading carries an icon again')
 if (!groupByHeader('DeepSeek')?.models.includes('DeepSeek Reasoner (modlens vision)')) {
   throw new Error('a folded model did not land in its base provider group')
@@ -483,9 +490,12 @@ if (groupsShown().length !== 5) throw new Error('the favorites scope must not re
 // Un-starring removes it from the favorites group and updates the badge.
 await act(async () => { starOf('DeepSeek Chat').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
 const favGroupAfter = liveGroup('Favorites')
-console.log('after un-star     :', favGroupAfter.models, '| favorites badge:', providerCount('Favorites'))
-if (favGroupAfter.models.length !== 0) throw new Error('un-starred model stayed in the favorites group')
-if (providerCount('Favorites') !== '0') throw new Error('favorites badge did not drop the star')
+const favFloorAfter = providerCount('Favorites')
+console.log('after un-star     :', favGroupAfter?.models ?? '(group gone)', '| favorites badge:', favFloorAfter ?? '(floor gone)')
+// Removing the last favorite takes the whole group with it, and its floor too:
+// an empty group is not rendered, so there is nothing to scroll to.
+if (favGroupAfter !== undefined) throw new Error('the favorites group must disappear once nothing is starred')
+if (favFloorAfter !== undefined) throw new Error('the favorites floor must disappear with its group')
 if (JSON.stringify(storedFavorites()) !== '[]') throw new Error('un-starring did not persist')
 
 // Leave the grouped list and an empty query for the search tests below.
@@ -501,8 +511,12 @@ const elevatorChips = [...container.querySelectorAll('.dsh-mp2-providers .dsh-mp
   return { name, chipText: chip?.textContent ?? null, chipHue: chip?.style.getPropertyValue('--dsh-mp2-hue') ?? null }
 })
 console.log('elevator chips    :', JSON.stringify(elevatorChips))
-// The history and favorites floors are mirrors, not suppliers.
-const MIRROR_FLOORS = ['Recent', 'Favorites']
+// The history and favorites floors are mirrors, not suppliers. A mirror that
+// has no rows has no floor either — and no group to jump to — so only the
+// floors actually present are checked here. Nothing is starred at this point.
+const MIRROR_FLOORS = ['Recent', 'Favorites'].filter((name) => providerRow(name) !== undefined)
+if (!MIRROR_FLOORS.includes('Recent')) throw new Error('the history floor is missing from the elevator')
+if (MIRROR_FLOORS.includes('Favorites')) throw new Error('a favorites floor with no rows must not be rendered')
 const isMirrorFloor = (name) => MIRROR_FLOORS.includes(name)
 for (const { name, chipText } of elevatorChips) {
   if (isMirrorFloor(name)) continue
@@ -600,16 +614,18 @@ const list = container.querySelector('.dsh-mp2-list')
 if (list === null) throw new Error('model list did not reopen')
 console.log('--- elevator ---')
 console.log('lit before click  :', activeProviderRow(), '| groups:', groupsShown().length)
-if (groupsShown().length !== 5) throw new Error('expected recent + favorites + 3 provider groups')
+// Nothing is starred here, so there is no favorites group: history + 3 suppliers.
+if (groupsShown().length !== 4) throw new Error('expected recent + 3 provider groups')
 
 const zhipuRow = providerRow('智谱 GLM')
 await act(async () => { zhipuRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
 console.log('lit after click   :', activeProviderRow(), '| groups:', groupsShown().length)
 if (activeProviderRow() !== '智谱 GLM') throw new Error('clicking a supplier row did not light it')
-if (groupsShown().length !== 5) throw new Error('clicking a supplier row filtered the list instead of travelling')
+if (groupsShown().length !== 4) throw new Error('clicking a supplier row filtered the list instead of travelling')
 
-// Scrolling the list moves the highlight, with no group removed. Groups are:
-// Recent (offset 0), Favorites (120), DeepSeek (240), 智谱 GLM (360), 一起安 (480).
+// Scrolling the list moves the highlight, with no group removed. Nothing is
+// starred, so there is no favorites group. Groups are: Recent (offset 0),
+// DeepSeek (120), 智谱 GLM (240), 一起安 (360).
 const groupEls = [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-group')]
 groupEls.forEach((el, index) => {
   Object.defineProperty(el, 'offsetTop', { value: index * 120, configurable: true })
@@ -621,17 +637,17 @@ const scrollTo = async (top) => {
 await scrollTo(0)
 console.log('lit at scrollTop 0   :', activeProviderRow())
 if (activeProviderRow() !== 'Recent') throw new Error('the spy did not light the history group at the top')
-await scrollTo(480)
-console.log('lit at scrollTop 480 :', activeProviderRow(), '| groups:', groupsShown().length)
-if (activeProviderRow() !== '一起安') throw new Error('the spy did not follow the scroll position')
-if (groupsShown().length !== 5) throw new Error('scrolling dropped a group')
 await scrollTo(360)
-console.log('lit at scrollTop 360 :', activeProviderRow())
+console.log('lit at scrollTop 360 :', activeProviderRow(), '| groups:', groupsShown().length)
+if (activeProviderRow() !== '一起安') throw new Error('the spy did not follow the scroll position')
+if (groupsShown().length !== 4) throw new Error('scrolling dropped a group')
+await scrollTo(240)
+console.log('lit at scrollTop 240 :', activeProviderRow())
 if (activeProviderRow() !== '智谱 GLM') throw new Error('the spy did not stop on the floor the list is standing on')
 // Mid-group stays on the floor the list is standing on, not the next one.
 await scrollTo(200)
 console.log('lit at scrollTop 200 :', activeProviderRow())
-if (activeProviderRow() !== 'Favorites') throw new Error('the spy switched floors too early')
+if (activeProviderRow() !== 'DeepSeek') throw new Error('the spy switched floors too early')
 
 // 9. Pure keyboard operation. The picker is search-first, so focus stays in the
 //    search box and the cursor is reported through `aria-activedescendant`
@@ -826,11 +842,18 @@ if (footerButton.tagName !== 'BUTTON' || footerButton.type !== 'button') throw n
 if (!footerButton.textContent.includes('Configure official models')) {
   throw new Error(`the footer must name what it configures, got ${JSON.stringify(footerButton.textContent)}`)
 }
-if (!footerButton.textContent.includes('Settings · Models')) {
-  throw new Error('the footer must name the surface it leaves for')
+// The destination is no longer printed in the row: a full-width bar with a
+// label on its far right read as the panel's second row of content and competed
+// with the list. It lives in the tooltip now, so the information is still there
+// when it is asked for and silent when it is not.
+if (!footerButton.title.includes('Settings · Models')) {
+  throw new Error(`the footer tooltip must still name the surface it leaves for, got ${JSON.stringify(footerButton.title)}`)
 }
-if (footerButton.querySelectorAll('svg').length !== 2) {
-  throw new Error('the footer wears a settings glyph and a leave-the-panel glyph')
+if (footerButton.textContent.includes('Settings · Models')) {
+  throw new Error('the destination must not be printed in the row again')
+}
+if (footerButton.querySelectorAll('svg').length !== 1) {
+  throw new Error('the footer entry wears one glyph and one label')
 }
 
 // 11-bis. The footer's other control folds the panel's OWN provider column, the
@@ -910,7 +933,12 @@ const openPopup = async () => {
 const menuCopy = () => ({
   search: container.querySelector('.dsh-mp2-search')?.placeholder ?? null,
   footer: container.querySelector('.dsh-mp2-footerLabel')?.textContent ?? null,
-  where: container.querySelector('.dsh-mp2-footerWhere')?.textContent ?? null,
+  // The destination is printed in the tooltip now, not in the row itself.
+  where: (() => {
+    const tip = container.querySelector('.dsh-mp2-footerAction')?.title ?? ''
+    const at = tip.indexOf(': ')
+    return at === -1 ? null : tip.slice(at + 2)
+  })(),
   panelCaption: container.querySelector('.dsh-mp2-paneCaption')?.textContent ?? null,
 })
 const setLang = async (tag) => {
