@@ -210,6 +210,11 @@ for (const [message, expected] of [
   ['限流中，请稍后再试', 'rate'],
   ['invalid api key provided', 'auth'],
   ['Unauthorized', 'auth'],
+  // The verbatim 429 body a live channel returned on 2026-10-12. The Host's
+  // own `isQuotaExceededError` answers FALSE for this sentence (measured), so
+  // if this route did not carry the Chinese wording itself, the one channel
+  // that most needs the class would fall through to a generic failure.
+  ['429: {"code":"1310","message":"您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。"}', 'quota'],
 ]) {
   const json = await classify({ code: 'PROVIDER_SPECIFIC', message })
   console.log('msg  %s ->', message.slice(0, 34).padEnd(34), json.state)

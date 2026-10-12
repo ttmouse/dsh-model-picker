@@ -1742,7 +1742,8 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     : realFetch(url, init))
   // §12 installed a `locale` service that reports `en`, and the service
   // outranks `<html lang>` for every mount from there on. This block asserts
-  // the Chinese labels, so it drives the higher-authority channel.
+  // the Chinese labels, so it drives the higher-authority channel — and puts
+  // it back, because every later case reads the English copy.
   localeActive = 'zh'
   try {
     const { host, root } = await failoverMount({}, CLEAN)
@@ -1808,6 +1809,10 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     await act(async () => { second.root.unmount() })
   } finally {
     globalThis.fetch = realFetch
+    // The two language channels go back to what §12 left behind: every later
+    // case in this file reads the English copy.
+    localeActive = 'en'
+    document.documentElement.lang = 'en'
   }
 }
 
