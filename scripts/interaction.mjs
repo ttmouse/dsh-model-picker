@@ -1616,39 +1616,199 @@ for (const [label, storage, stage] of [
   await act(async () => { root.unmount() })
 }
 
-// 13k.1. Search the dedicated page, add multiple candidates, and reorder priority.
-{
-  const { host, root } = await failoverMount({}, CLEAN)
+// ── Shared walks for the fallback page and the failure ledger ──
+
+/** Open the picker and walk to the fallback page, as a person would. */
+async function openFallbackPage(host) {
   await act(async () => { host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
   await act(async () => { host.querySelector('.dsh-mp2-footerFallback').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+}
+
+/** Type into the fallback page's own search box (empty string clears it). */
+async function typeFallbackSearch(host, needle) {
   const search = host.querySelector('.dsh-mp2-fallbackPage input[type="search"]')
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set
-    setter.call(search, 'GLM-4.6')
+    setter.call(search, needle)
     search.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
     search.dispatchEvent(new dom.window.Event('change', { bubbles: true }))
   })
-  const glm = [...host.querySelectorAll('.dsh-mp2-fallbackCandidate')].find((node) => node.textContent.includes('GLM-4.6'))
-  if (glm === undefined) throw new Error('fallback search must find GLM-4.6')
-  await act(async () => { glm.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-  const queryInput = host.querySelector('.dsh-mp2-fallbackPage input[type="search"]')
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set
-    setter.call(queryInput, 'Qwen3 Max')
-    queryInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
-    queryInput.dispatchEvent(new dom.window.Event('change', { bubbles: true }))
-  })
-  const qwen = [...host.querySelectorAll('.dsh-mp2-fallbackCandidate')].find((node) => node.textContent.includes('Qwen3 Max'))
-  if (qwen === undefined) throw new Error('fallback search must find Qwen3 Max')
-  await act(async () => { qwen.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-  const firstDown = host.querySelector('.dsh-mp2-fallbackRow button[title="Move down"]')
-  await act(async () => { firstDown.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+}
+
+/** Type a needle into the fallback page's own search, add the first hit, and go
+ *  back to the queue — the queue is only drawn while the box is empty. */
+async function addFallbackCandidate(host, needle) {
+  await typeFallbackSearch(host, needle)
+  const hit = [...host.querySelectorAll('.dsh-mp2-fallbackCandidates .dsh-mp2-option')].find((node) => node.textContent.includes(needle))
+  if (hit === undefined) throw new Error(`fallback search must find ${needle}`)
+  await act(async () => { hit.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  await typeFallbackSearch(host, '')
+}
+
+/** The probe button on the first queued row. */
+const probeButtonOf = (host) => host.querySelector('.dsh-mp2-fallbackItem .dsh-mp2-fallbackTest')
+
+/** Let a fetch-backed probe settle: its result arrives through microtasks. */
+const flushProbe = async () => { await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 0) }) }) }
+
+/** What the ledger holds right now. */
+const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.failures') ?? 'null')
+
+// 13k.1. Search the dedicated page and add candidates. Reordering is a pointer
+//        drag now, which jsdom cannot drive (its rows have no geometry), so the
+//        drag is asserted at the door: every queued row is an item that names the
+//        gesture it answers to.
+{
+  const { host, root } = await failoverMount({}, CLEAN)
+  await openFallbackPage(host)
+  await addFallbackCandidate(host, 'GLM-4.6')
+  await addFallbackCandidate(host, 'Qwen3 Max')
   const ordered = JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback'))
-  console.log('manage page   : ordered=%s', JSON.stringify(ordered))
-  if (JSON.stringify(ordered) !== JSON.stringify(['17an/qwen3-max', 'zhipu/glm-4.6'])) {
-    throw new Error(`search, add, and reorder must persist priority order, got ${JSON.stringify(ordered)}`)
+  const rows = [...host.querySelectorAll('.dsh-mp2-fallbackItem')]
+  console.log('manage page   : ordered=%s rows=%d', JSON.stringify(ordered), rows.length)
+  if (JSON.stringify(ordered) !== JSON.stringify(['zhipu/glm-4.6', '17an/qwen3-max'])) {
+    throw new Error(`adding through the search must append in priority order, got ${JSON.stringify(ordered)}`)
+  }
+  if (rows.length !== 2) throw new Error(`both added routes must be in the queue, got ${rows.length} rows`)
+  if (rows.some((row) => (row.getAttribute('title') ?? '') === '')) {
+    throw new Error('a queued row must name the drag that reorders it')
   }
   await act(async () => { root.unmount() })
+}
+
+// 13k.2. A probe that comes back failed stamps the route with the time it
+//        failed. The stamp is the point: it has to survive closing the page,
+//        because the answer gets read later, when someone is choosing a model.
+{
+  const realFetch = globalThis.fetch
+  const probe = { body: { ok: false, error: 'timeout' } }
+  globalThis.fetch = async (url, init) => (String(url).includes('/api/model-picker/test')
+    ? { ok: true, json: async () => probe.body }
+    : realFetch(url, init))
+  try {
+    const { host, root } = await failoverMount({}, CLEAN)
+    await openFallbackPage(host)
+    await addFallbackCandidate(host, 'GLM-4.6')
+    await act(async () => { probeButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    const entry = ledgerOf()?.['zhipu/glm-4.6']
+    console.log('fail ledger   : %s', JSON.stringify(entry))
+    if (entry === undefined || Math.abs(entry.at - Date.now()) > 10_000) {
+      throw new Error(`a failed probe must stamp the route with the time it failed, got ${JSON.stringify(entry)}`)
+    }
+    if (entry.source !== 'test' || entry.error !== 'timeout') {
+      throw new Error(`the record must say what probed it and what it said, got ${JSON.stringify(entry)}`)
+    }
+    if (!probeButtonOf(host).textContent.includes('Failed')) {
+      throw new Error('the button must keep showing the failed result')
+    }
+    await act(async () => { root.unmount() })
+
+    // Remounted with the record still in storage: the answer is on the row.
+    const second = await failoverMount({
+      'dsh.modelPicker.fallback': JSON.stringify(['zhipu/glm-4.6']),
+      'dsh.modelPicker.failures': JSON.stringify({ 'zhipu/glm-4.6': entry }),
+    }, CLEAN)
+    await openFallbackPage(second.host)
+    const again = probeButtonOf(second.host)
+    console.log('after remount : label=%s', JSON.stringify(again?.textContent ?? null))
+    if (again === null || !again.textContent.includes('Failed')) {
+      throw new Error('a recorded failure must still show after the page is reopened')
+    }
+    // A probe that answers clears the record: the row must not go on calling a
+    // live channel dead.
+    probe.body = { ok: true, ms: 90 }
+    await act(async () => { again.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    console.log('after a pass  : ledger=%s', JSON.stringify(ledgerOf()))
+    if (ledgerOf()?.['zhipu/glm-4.6'] !== undefined) throw new Error('a route that answered must lose its stamp')
+    await act(async () => { second.root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+}
+
+
+// 13k.3. A failed probe says WHICH failure it was. "Failed" is the right answer
+//        to "is it reachable" and the wrong one to "should I still pick this":
+//        an exhausted balance and a momentary throttle look identical and call
+//        for opposite responses, so the host's class has to reach the row —
+//        both on the spot and after the page is reopened from the ledger.
+{
+  const realFetch = globalThis.fetch
+  const probe = { body: { ok: false, state: 'quota', error: 'insufficient balance' } }
+  globalThis.fetch = async (url, init) => (String(url).includes('/api/model-picker/test')
+    ? { ok: true, json: async () => probe.body }
+    : realFetch(url, init))
+  // §12 installed a `locale` service that reports `en`, and the service
+  // outranks `<html lang>` for every mount from there on. This block asserts
+  // the Chinese labels, so it drives the higher-authority channel.
+  localeActive = 'zh'
+  try {
+    const { host, root } = await failoverMount({}, CLEAN)
+    await openFallbackPage(host)
+    await addFallbackCandidate(host, 'GLM-4.6')
+    await act(async () => { probeButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    const button = probeButtonOf(host)
+    console.log('quota label   : %s | %s', JSON.stringify(button.textContent), JSON.stringify(button.getAttribute('title')))
+    if (!button.textContent.includes('额度耗尽')) {
+      throw new Error(`a spent balance must say so on the row, got ${JSON.stringify(button.textContent)}`)
+    }
+    if (button.className.includes('dsh-mp2-fallbackTest-fail')) {
+      throw new Error('a classified failure must not wear the generic failure class')
+    }
+    if (!button.className.includes('dsh-mp2-fallbackTest-quota')) {
+      throw new Error(`the button must wear its own state class, got ${JSON.stringify(button.className)}`)
+    }
+    // The tooltip explains what the class means for the reader, and still
+    // carries the provider's own words: the class is the routing decision, the
+    // sentence is the evidence.
+    const tip = button.getAttribute('title') ?? ''
+    if (!tip.includes('余额') || !tip.includes('insufficient balance')) {
+      throw new Error(`the tooltip must explain the class and keep the provider's words, got ${JSON.stringify(tip)}`)
+    }
+    const stored = ledgerOf()?.['zhipu/glm-4.6']
+    if (stored?.state !== 'quota') {
+      throw new Error(`the ledger must keep the class, not just the fact of a failure, got ${JSON.stringify(stored)}`)
+    }
+    await act(async () => { root.unmount() })
+
+    // Reopened from the ledger alone: no in-memory result exists, so the row
+    // reads the class out of storage. Collapsing to "Failed" here is exactly
+    // the regression this pins.
+    const second = await failoverMount({
+      'dsh.modelPicker.fallback': JSON.stringify(['zhipu/glm-4.6']),
+      'dsh.modelPicker.failures': JSON.stringify({ 'zhipu/glm-4.6': stored }),
+    }, CLEAN)
+    await openFallbackPage(second.host)
+    const again = probeButtonOf(second.host)
+    console.log('after remount : label=%s', JSON.stringify(again?.textContent ?? null))
+    if (again === null || !again.textContent.includes('额度耗尽')) {
+      throw new Error(`a remembered quota failure must reopen as 额度耗尽, got ${JSON.stringify(again?.textContent ?? null)}`)
+    }
+
+    // …and the other classes are distinct states, not one "not ok" bucket.
+    for (const [state, expected] of [['rate', '限流'], ['auth', '认证失败'], ['timeout', '超时'], ['error', '不通']]) {
+      probe.body = { ok: false, state, error: 'provider said something' }
+      await act(async () => { again.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+      await flushProbe()
+      const label = probeButtonOf(second.host).textContent
+      console.log('state %s ->', state.padEnd(8), JSON.stringify(label))
+      if (!label.includes(expected)) throw new Error(`state ${state} must read as ${expected}, got ${JSON.stringify(label)}`)
+    }
+    // A host that predates the `state` field still has to render something
+    // truthful rather than an empty label or a crash.
+    probe.body = { ok: false, error: 'legacy host' }
+    await act(async () => { probeButtonOf(second.host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    if (!probeButtonOf(second.host).textContent.includes('不通')) {
+      throw new Error('an older host without a state field must degrade to the generic failure')
+    }
+    await act(async () => { second.root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
+  }
 }
 
 // 13l. The earlier `{route, enabled}` record still yields its route, so a choice
@@ -1830,6 +1990,67 @@ const noteOf = (host) => host.querySelector('.dsh-mp2-autoNote')
   }
   if (repairCalls.prompts.length !== 2) {
     throw new Error(`the second failure must send its own repair, got ${repairCalls.prompts.length}`)
+  }
+  await act(async () => { root.unmount() })
+}
+
+
+/** The row for one model, matched on its own name rather than on substring. */
+const rowOfModel = (host, name) =>
+  [...host.querySelectorAll('.dsh-mp2-list .dsh-mp2-option')]
+    .find((node) => node.querySelector('.dsh-mp2-modelName')?.textContent === name) ?? null
+
+// 13s. The ledger is not only the probe's notebook. A turn that fails stamps the
+//      model it failed ON, and the row in the model list wears that time — the
+//      list is where the next prompt gets its model chosen, so it is where the
+//      fact has to be.
+{
+  const { host, root } = await liveMount({}, AGENT_FAILURE)
+  const entry = ledgerOf()?.['deepseek/deepseek-reasoner']
+  console.log('turn ledger   : %s', JSON.stringify(entry))
+  if (entry === undefined || entry.source !== 'turn' || entry.error !== 'stream ended unexpectedly') {
+    throw new Error(`a turn that failed must stamp the model it failed on, got ${JSON.stringify(entry)}`)
+  }
+  await act(async () => { host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  const mark = rowOfModel(host, 'DeepSeek Reasoner')?.querySelector('.dsh-mp2-failMark') ?? null
+  console.log('turn row      : mark=%s title=%s', JSON.stringify(mark?.textContent ?? null), JSON.stringify(mark?.getAttribute('title') ?? null))
+  if (mark === null || !/\d{2}:\d{2}$/.test(mark.textContent)) {
+    throw new Error('the row a turn failed on must wear the time it failed')
+  }
+  if (!mark.getAttribute('title').includes('the turn failed')) {
+    throw new Error('the stamp must say, on hover, what kind of failure it records')
+  }
+  await act(async () => { root.unmount() })
+}
+
+// 13t. A failure the seat only found in the log stamps nothing: opening a session
+//      out of history is not a channel going down, and dating the row to the
+//      moment it was read would be a lie about when it broke.
+{
+  const { host, root } = await failoverMount({}, SEND_FAILURE)
+  const ledger = ledgerOf()
+  console.log('old failure   : ledger=%s', JSON.stringify(ledger))
+  if (ledger !== null && Object.keys(ledger).length !== 0) {
+    throw new Error('a failure the seat did not watch arrive must not be stamped')
+  }
+  await act(async () => { root.unmount() })
+}
+
+// 13u. A stamp past its use-by date is dropped on read, so a channel that died
+//      three weeks ago cannot go on accusing it.
+{
+  const stale = { at: Date.now() - 30 * 24 * 60 * 60 * 1000, source: 'test', error: 'timeout' }
+  const fresh = { at: Date.now() - 2 * 24 * 60 * 60 * 1000, source: 'test', error: 'timeout' }
+  const { host, root } = await failoverMount(
+    { 'dsh.modelPicker.failures': JSON.stringify({ 'zhipu/glm-4.6': stale, '17an/qwen3-max': fresh }) },
+    CLEAN,
+  )
+  await act(async () => { host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  const marked = [...host.querySelectorAll('.dsh-mp2-failMark')]
+    .map((node) => node.closest('.dsh-mp2-option')?.querySelector('.dsh-mp2-modelName')?.textContent ?? '?')
+  console.log('stale stamp   : marked=%s', JSON.stringify(marked))
+  if (marked.length !== 1 || marked[0] !== 'Qwen3 Max') {
+    throw new Error(`only an unexpired stamp may show, got ${JSON.stringify(marked)}`)
   }
   await act(async () => { root.unmount() })
 }

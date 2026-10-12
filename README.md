@@ -209,7 +209,9 @@ re-sending the request reads as a fresh instruction and risks redoing finished
 work — that repair instead tells the model to inspect the current state first.
 A bare "continue" is deliberately never used, because it reads as new input.
 
-**Designating fallback models.** The popup footer's **Fallback models** entry opens a manager where you can search for and add multiple models, reorder their priority, or remove them. Failover uses the first available route in that order that differs from the model that just failed. Older single-route settings migrate automatically. The queue persists in `localStorage` under `dsh.modelPicker.fallback`.
+**Designating fallback models.** The popup footer's **Fallback models** entry opens a manager where you can search for and add multiple models, drag them into priority order, or remove them. Failover uses the first available route in that order that differs from the model that just failed. Older single-route settings migrate automatically. The queue persists in `localStorage` under `dsh.modelPicker.fallback`.
+
+**Probing a route, and remembering when it last failed.** Every row in that manager carries a **Test connection** button: it sends one tiny prompt through the Host's own model runtime and reports OK with the round trip, or Failed with the reason. A route that fails — from that probe, or from a turn that actually died on the model in use — is stamped in `localStorage` under `dsh.modelPicker.failures`, with the time it failed and what said so. The model list then wears that time after the model's name: an alert glyph and a clock, the source and the message in the tooltip. The one moment a dead channel is worth knowing about is the moment the next model is being chosen. A probe that answers clears the stamp, and a stamp older than two weeks is dropped on read, so the mark states a recent fact instead of keeping a permanent record. Unlike the vision mark, the pin and the star, it reserves no space — an absent stamp leaves no gap.
 
 **It retires itself.** The failure state is read through the Session's own
 `subscribe`/`getSnapshot` pair, so the button appears the moment the Host reports
@@ -438,9 +440,18 @@ colour changes stay, because they aid comprehension rather than being motion.
   does not switch to itself; and a second failure after the session healed
   escalates again, which is what keeps the loop breaker per-failure rather than
   per-session.
+  The failure ledger is asserted end to end: a failed probe writes a timestamped
+  record that survives a remount and still shows on the model row, a probe that
+  answers clears it, a turn that fails stamps the model it failed on while a
+  failure only found in the log stamps nothing, and a stamp past the two-week
+  window never renders at all.
 - `scripts/host-route.mjs` drives the real route handler with a stub `llm`:
   asserts the row shape, that a throwing provider/model is isolated, and that
-  the 30s cache answers without re-listing.
+  the 30s cache answers without re-listing. The connection-test route is driven
+  the same way: a clean stream answers OK, while an error finish, an abort or a
+  thrown provider comes back as a failure carrying the reason — and both routes
+  are asserted to keep answering after the plugin's own context goes inactive,
+  which is the case that used to make every model look dead.
 
 **Icon alignment.** An inline `<svg>` sits on the text baseline, so the font's
 descender space below it lifts the glyph above the centre of its own line box —
