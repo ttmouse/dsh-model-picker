@@ -176,17 +176,81 @@ console.log('test fail  :', JSON.stringify(failResult.json))
 if (failResult.status !== 200 || failResult.json.ok !== false) throw new Error('an error finish must test as not ok')
 if (failResult.json.error !== 'quota exhausted') throw new Error(`the failure message must surface, got ${JSON.stringify(failResult.json.error)}`)
 
+// ─── The failure class ───
+//
+// "Not reachable" is the wrong answer to the question this button is asked.
+// An exhausted balance and a momentary throttle both fail, and they call for
+// opposite responses (top up versus wait), so each has to survive the trip
+// out to the browser as its own state.
+//
+// The runtime's own codes are the first source: the harness classifies an
+// exhausted account balance as QUOTA, first-party token quota as
+// ACCOUNT_QUOTA, and a throttled request as RATE_LIMIT. Both orders matter —
+// a code is right about the class even when the sentence says nothing, and
+// the sentence is all a third-party adapter leaves behind.
+const classify = async (failure) => {
+  const mount_ = mount(testLlm(() => streamOf({ type: 'finish', reason: { kind: 'error', failure } })))
+  return (await call(mount_.routes.get(TEST_PATH), post({ provider: 'p', model: 'm' }))).json
+}
+
+for (const [code, expected] of [['QUOTA', 'quota'], ['ACCOUNT_QUOTA', 'quota'], ['RATE_LIMIT', 'rate'], ['AUTH', 'auth'], ['SERVER', 'error'], ['HTTP_503', 'error']]) {
+  const json = await classify({ code, message: 'the provider said something this table has never seen' })
+  console.log('code %s ->', code.padEnd(12), json.state)
+  if (json.state !== expected) throw new Error(`code ${code} must classify as ${expected}, got ${JSON.stringify(json.state)}`)
+}
+
+// A provider code the harness has never mapped is not a class: the sentence
+// decides, which is the only signal a foreign adapter gives.
+for (const [message, expected] of [
+  ['insufficient balance', 'quota'],
+  ['You exceeded your current quota, please check your plan', 'quota'],
+  ['额度已耗尽，请充值', 'quota'],
+  ['Rate limit reached for requests', 'rate'],
+  ['Too many requests, please try again later', 'rate'],
+  ['限流中，请稍后再试', 'rate'],
+  ['invalid api key provided', 'auth'],
+  ['Unauthorized', 'auth'],
+]) {
+  const json = await classify({ code: 'PROVIDER_SPECIFIC', message })
+  console.log('msg  %s ->', message.slice(0, 34).padEnd(34), json.state)
+  if (json.state !== expected) throw new Error(`${JSON.stringify(message)} must classify as ${expected}, got ${JSON.stringify(json.state)}`)
+}
+
+// Quota outranks rate when both wordings appear: "you have no quota left" is
+// the terminal reading, and telling the reader to wait would be wrong.
+const both = await classify({ code: 'PROVIDER_SPECIFIC', message: 'rate limit exceeded — insufficient balance to retry' })
+if (both.state !== 'quota') throw new Error(`an exhausted balance outranks throttling wording, got ${JSON.stringify(both.state)}`)
+
+// An unmapped failure with nothing recognizable in it stays the generic
+// failure: inventing a class here would be a guess dressed as an answer.
+const unknown = await classify({ code: 'WEIRD', message: 'stream ended unexpectedly' })
+if (unknown.state !== 'error') throw new Error(`an unrecognizable failure must stay generic, got ${JSON.stringify(unknown.state)}`)
+
 // An aborted route (the 30s timeout): reported, not mistaken for health.
 const aborted = testLlm(() => streamOf({ type: 'finish', reason: { kind: 'aborted', failure: { code: 'ABORTED' } } }))
 const abortMount = mount(aborted)
 const abortResult = await call(abortMount.routes.get(TEST_PATH), post({ provider: 'slow', model: 'model' }))
 if (abortResult.json.ok !== false || abortResult.json.error !== 'ABORTED') throw new Error('an aborted finish must test as not ok with its code')
+// The abort is this route's own deadline, not the provider's verdict, so it
+// is reported as a timeout rather than classified as a quota or auth failure.
+if (abortResult.json.state !== 'timeout') throw new Error(`an abort must report as a timeout, got ${JSON.stringify(abortResult.json.state)}`)
 
 // A stream that throws outright (adapter failure before the first chunk).
 const exploding = testLlm(() => { throw new Error('adapter exploded') })
 const explodeMount = mount(exploding)
 const explodeResult = await call(explodeMount.routes.get(TEST_PATH), post({ provider: 'x', model: 'y' }))
 if (explodeResult.json.ok !== false || explodeResult.json.error !== 'adapter exploded') throw new Error('a throwing stream must test as not ok with its message')
+if (explodeResult.json.state !== 'error') throw new Error('a thrown stream with nothing recognizable must stay generic')
+
+// A thrown error still carries its class when it has one: adapters that fail
+// before the first chunk throw rather than finish, and that path must not
+// flatten a spent balance into "failed".
+const throwingQuota = {
+  stream: () => { const error = new Error('insufficient balance'); error.code = 'QUOTA'; throw error },
+}
+const throwingQuotaResult = await call(mount(throwingQuota).routes.get(TEST_PATH), post({ provider: 'x', model: 'y' }))
+console.log('thrown     :', JSON.stringify(throwingQuotaResult.json))
+if (throwingQuotaResult.json.state !== 'quota') throw new Error(`a thrown quota failure must classify, got ${JSON.stringify(throwingQuotaResult.json.state)}`)
 
 // Protocol guards: wrong method and malformed body.
 const guardMount = mount(testLlm(() => streamOf()))
