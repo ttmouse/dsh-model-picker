@@ -1078,7 +1078,7 @@ if (liveGroup('Favorites') === undefined) throw new Error('the favorites group m
 //     Settings → 模型, and the panel is exactly where that is noticed.
 console.log('--- settings hand-off ---')
 const footerRow = () => container.querySelector('.dsh-mp2-footer')
-const footerAction = () => container.querySelector('.dsh-mp2-footerAction')
+const footerAction = () => container.querySelector('.dsh-mp2-footerSettings')
 if (container.querySelector('.dsh-mp2-menu') === null) throw new Error('the popup must be open to test its footer')
 const footerNode = footerRow()
 if (footerNode === null) throw new Error('the model popup must carry the settings footer')
@@ -1087,25 +1087,70 @@ if (footerNode === null) throw new Error('the model popup must carry the setting
 if (footerNode.closest('.dsh-mp2-list') !== null) throw new Error('the footer must sit outside the scrolling list')
 if (footerNode.parentElement.className !== 'dsh-mp2-menu') throw new Error('the footer must be a direct child of the popup')
 assertVectorIcons(footerNode, 'the settings footer')
-const footerButton = footerAction()
-console.log('footer label     :', footerButton.textContent, '| tag:', footerButton.tagName)
-if (footerButton.tagName !== 'BUTTON' || footerButton.type !== 'button') throw new Error('the footer row must be a real button')
-if (!footerButton.textContent.includes('Configure official models')) {
-  throw new Error(`the footer must name what it configures, got ${JSON.stringify(footerButton.textContent)}`)
+
+// 11a. The two settings entries sit together at the trailing edge, and each one
+//      names its subject. A bare glyph makes the reader recognise two shapes to
+//      find two settings pages, in a row that is otherwise empty — the label is
+//      what makes the pair readable, and grouping is what makes it one decision.
+const footerCluster = footerNode.querySelector('.dsh-mp2-footerCluster')
+if (footerCluster === null) throw new Error('the two settings entries must share one cluster')
+if (footerCluster.parentElement !== footerNode) throw new Error('the cluster must be a direct child of the footer row')
+const clusterButtons = [...footerCluster.querySelectorAll('button')]
+console.log('footer cluster  :', clusterButtons.map((b) => b.textContent))
+if (clusterButtons.length !== 2) {
+  throw new Error(`the cluster must hold exactly the two settings entries, got ${clusterButtons.length}`)
 }
-// The destination is no longer printed in the row: a full-width bar with a
-// label on its far right read as the panel's second row of content and competed
-// with the list. It lives in the tooltip now, so the information is still there
-// when it is asked for and silent when it is not.
-if (!footerButton.title.includes('Settings · Models')) {
-  throw new Error(`the footer tooltip must still name the surface it leaves for, got ${JSON.stringify(footerButton.title)}`)
+// Auto margin distributes free space, so two separately-margined buttons would
+// be pushed apart by the emptiness between them. One margin on the wrapper is
+// what holds them together, and it must sit on the trailing edge.
+if (footerCluster.getAttribute('style') !== null) throw new Error('the cluster must not be positioned from script')
+const clusterGap = dom.window.getComputedStyle(footerCluster).marginLeft
+if (clusterGap !== 'auto') throw new Error(`the settings cluster must take the free space at the trailing edge, got ${clusterGap}`)
+// Order: fallback first, then the settings page. It matches the row the entries
+// replaced and keeps the more-used entry closest to the panel's fold toggle.
+const [fallbackButton, settingsButton] = clusterButtons
+// Neither child carries a margin of its own: the gap must come from the cluster,
+// or the pair drifts apart when one of the two labels is a different length.
+for (const entry of clusterButtons) {
+  const own = dom.window.getComputedStyle(entry).marginLeft
+  if (own === 'auto' || Number.parseFloat(own) !== 0) {
+    throw new Error(`the cluster's own children must not carry margins, got ${own}`)
+  }
 }
-if (footerButton.textContent.includes('Settings · Models')) {
+if (!fallbackButton.className.includes('dsh-mp2-footerFallback')) {
+  throw new Error('the fallback entry leads the cluster')
+}
+if (!fallbackButton.textContent.includes('Fallback')) {
+  throw new Error(`the fallback entry must name its subject, got ${JSON.stringify(fallbackButton.textContent)}`)
+}
+if (fallbackButton.title !== 'Fallback models') {
+  throw new Error(`the fallback tooltip must name the page it opens, got ${JSON.stringify(fallbackButton.title)}`)
+}
+for (const [entry, subject] of [[fallbackButton, 'Fallback'], [settingsButton, 'Models']]) {
+  if (entry.querySelectorAll('svg').length !== 1) throw new Error(`${subject}: one glyph and one label`)
+  if (!entry.querySelector('.dsh-mp2-footerLabel')) throw new Error(`${subject}: the label must be its own element`)
+  // The visible copy is short; the full sentence belongs in the tooltip.
+  if (entry.textContent.length > 12) {
+    throw new Error(`${subject}: the row label must stay short, got ${JSON.stringify(entry.textContent)}`)
+  }
+  if (!entry.getAttribute('aria-label')) throw new Error(`${subject}: must be named for screen readers`)
+  if (entry.getAttribute('aria-label').length <= entry.textContent.length) {
+    throw new Error(`${subject}: the accessible name must carry the full sentence`)
+  }
+}
+// The destination is not printed in the row: a full-width bar with a label on its
+// far right read as the panel's second row of content. The row keeps the short
+// subject and the tooltip keeps the whole sentence, so the full wording is still
+// there when it is asked for and silent when it is not.
+if (!settingsButton.title.includes('Settings · Models')) {
+  throw new Error(`the footer tooltip must still name the surface it leaves for, got ${JSON.stringify(settingsButton.title)}`)
+}
+if (settingsButton.textContent.includes('Settings · Models')) {
   throw new Error('the destination must not be printed in the row again')
 }
-if (footerButton.querySelectorAll('svg').length !== 1) {
-  throw new Error('the footer entry wears one glyph and one label')
-}
+// …and the hand-off itself is unchanged by the label: one click still writes the
+// 模型 section and closes the picker, and never doubles as a model pick.
+const footerButton = settingsButton
 
 // 11-bis. The footer's other control folds the panel's OWN provider column, the
 //        table of contents, so the model list gets that width back. The fold is
@@ -1116,6 +1161,14 @@ const footerToggle = () => container.querySelector('.dsh-mp2-footerIcon')
 if (footerToggle() === null) throw new Error('the footer must carry a provider-column toggle')
 if (footerToggle().querySelector('svg') === null) throw new Error('the provider toggle must be a vector icon')
 if (!footerToggle().getAttribute('aria-label')) throw new Error('the provider toggle must be named for screen readers')
+// It stays a bare glyph: it folds the panel in front of the user, not a setting
+// elsewhere, so it wears no label and is not part of the settings cluster.
+if (footerNode.querySelector('.dsh-mp2-footerCluster').contains(footerToggle())) {
+  throw new Error('the provider toggle is not a settings entry')
+}
+if (footerToggle().textContent.trim() !== '') {
+  throw new Error(`the provider toggle must stay a bare glyph, got ${JSON.stringify(footerToggle().textContent)}`)
+}
 if (folded()) throw new Error('the provider column must start visible')
 const callsBeforeToggle = shortcutCalls.length
 await act(async () => { footerToggle().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
@@ -1183,10 +1236,11 @@ const openPopup = async () => {
 }
 const menuCopy = () => ({
   search: container.querySelector('.dsh-mp2-search')?.placeholder ?? null,
-  footer: container.querySelector('.dsh-mp2-footerLabel')?.textContent ?? null,
+  footer: container.querySelector('.dsh-mp2-footerSettings .dsh-mp2-footerLabel')?.textContent ?? null,
+  footerFallback: container.querySelector('.dsh-mp2-footerFallback .dsh-mp2-footerLabel')?.textContent ?? null,
   // The destination is printed in the tooltip now, not in the row itself.
   where: (() => {
-    const tip = container.querySelector('.dsh-mp2-footerAction')?.title ?? ''
+    const tip = container.querySelector('.dsh-mp2-footerSettings')?.title ?? ''
     const at = tip.indexOf(': ')
     return at === -1 ? null : tip.slice(at + 2)
   })(),
@@ -1214,7 +1268,8 @@ await setLang('en')
 const english = menuCopy()
 console.log('html lang en     :', JSON.stringify(english))
 if (english.search !== 'Search model or provider…') throw new Error(`English copy did not follow <html lang="en">: ${english.search}`)
-if (english.footer !== 'Configure official models') throw new Error(`English footer copy wrong: ${english.footer}`)
+if (english.footer !== 'Models') throw new Error(`English footer copy wrong: ${english.footer}`)
+if (english.footerFallback !== 'Fallback') throw new Error(`English fallback-footer copy wrong: ${english.footerFallback}`)
 
 await setLang('zh-CN')
 const chinese = menuCopy()
@@ -1222,7 +1277,8 @@ console.log('html lang zh-CN  :', JSON.stringify(chinese))
 if (chinese.search !== '搜索模型或提供商…') {
   throw new Error(`an open popup must switch to Chinese with the app, got ${JSON.stringify(chinese.search)}`)
 }
-if (chinese.footer !== '配置官方模型') throw new Error(`Chinese footer copy wrong: ${chinese.footer}`)
+if (chinese.footer !== '官方模型') throw new Error(`Chinese footer copy wrong: ${chinese.footer}`)
+if (chinese.footerFallback !== '兜底模型') throw new Error(`Chinese fallback-footer copy wrong: ${chinese.footerFallback}`)
 if (chinese.where !== '设置 · 模型') throw new Error(`Chinese destination copy wrong: ${chinese.where}`)
 if (chinese.panelCaption !== '全部提供商') throw new Error(`Chinese column caption wrong: ${chinese.panelCaption}`)
 
@@ -1564,7 +1620,7 @@ for (const [label, storage, stage] of [
 {
   const { host, root } = await failoverMount({}, CLEAN)
   await act(async () => { host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
-  await act(async () => { host.querySelector('.dsh-mp2-fallbackManage').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  await act(async () => { host.querySelector('.dsh-mp2-footerFallback').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
   const search = host.querySelector('.dsh-mp2-fallbackPage input[type="search"]')
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set

@@ -359,14 +359,31 @@ if (seat.trigger) {
   }
   const footer = await page.evaluate(() => {
     const row = document.querySelector('.dsh-mp2-footer')
-    const button = document.querySelector('.dsh-mp2-footerAction')
+    const cluster = document.querySelector('.dsh-mp2-footerCluster')
+    const button = document.querySelector('.dsh-mp2-footerSettings')
     const menu = document.querySelector('.dsh-mp2-menu')
+    const box = (node) => {
+      if (node === null) return null
+      const r = node.getBoundingClientRect()
+      return { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) }
+    }
     return {
       present: row !== null,
       parent: row?.parentElement?.className ?? null,
       insideList: row?.closest('.dsh-mp2-list') !== null,
       label: button?.textContent ?? null,
       svgs: button?.querySelectorAll('svg').length ?? 0,
+      // The pair must read as one group at the trailing edge: contiguous boxes,
+      // both right-aligned with the popup's own edge, and clear of the fold
+      // toggle that leads the row. Measured here, not in jsdom, because only a
+      // real layout settles the free space a cluster claims.
+      clusterEntries: [...(cluster?.querySelectorAll('button') ?? [])].map((b) => ({
+        label: b.textContent,
+        svgs: b.querySelectorAll('svg').length,
+        ...box(b),
+      })),
+      cluster: box(cluster),
+      fold: box(document.querySelector('.dsh-mp2-footerIcon')),
       // 0 means the row sits on the popup's own bottom edge, under the body.
       gapToBottom: row === null || menu === null
         ? null
@@ -379,8 +396,28 @@ if (seat.trigger) {
   if (footer.insideList) throw new Error('the footer scrolls with the list instead of sitting under it')
   if (footer.parent !== 'dsh-mp2-menu') throw new Error(`the footer is not a direct child of the popup: ${footer.parent}`)
   if (footer.svgs !== 1) throw new Error(`the footer entry is one glyph and one label, got ${footer.svgs} svg`)
+  if (footer.clusterEntries.length !== 2) {
+    throw new Error(`the two settings entries must share one cluster, got ${footer.clusterEntries.length}`)
+  }
+  for (const entry of footer.clusterEntries) {
+    if (entry.svgs !== 1) throw new Error(`${entry.label}: one glyph and one label`)
+    if (entry.label.trim() === '') throw new Error('a footer entry rendered with no label')
+  }
+  // Contiguous: the gap between the pair is the cluster's own padding, not the
+  // leftover space of a row that pushed them to opposite ends.
+  const [first, second] = footer.clusterEntries
+  const gap = second.left - first.right
+  if (gap < 0 || gap > 12) throw new Error(`the two settings entries are not adjacent, gap ${gap}px`)
+  // Trailing edge: the pair ends where the popup ends, and the fold toggle keeps
+  // the opposite end to itself.
+  if (second.right !== footer.cluster.right) {
+    throw new Error(`the cluster must hug the trailing edge, got ${second.right} vs ${footer.cluster.right}`)
+  }
+  if (footer.fold !== null && footer.fold.right > first.left) {
+    throw new Error('the fold toggle has drifted into the settings cluster')
+  }
 
-  await page.click('.dsh-mp2-footerAction')
+  await page.click('.dsh-mp2-footerSettings')
   await page.waitForTimeout(1200)
   const handedOff = await page.evaluate(() => {
     const panel = document.querySelector('[data-shortcut-modal="settings"]')
@@ -419,7 +456,8 @@ if (seat.trigger) {
   const appCopy = () => page.evaluate(() => ({
     declared: document.documentElement.lang,
     search: document.querySelector('.dsh-mp2-search')?.placeholder ?? null,
-    footer: document.querySelector('.dsh-mp2-footerLabel')?.textContent ?? null,
+    footer: document.querySelector('.dsh-mp2-footerSettings .dsh-mp2-footerLabel')?.textContent ?? null,
+    footerFallback: document.querySelector('.dsh-mp2-footerFallback .dsh-mp2-footerLabel')?.textContent ?? null,
   }))
   const before = await appCopy()
   console.log('--- language ---')

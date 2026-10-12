@@ -209,11 +209,7 @@ re-sending the request reads as a fresh instruction and risks redoing finished
 work — that repair instead tells the model to inspect the current state first.
 A bare "continue" is deliberately never used, because it reads as new input.
 
-**Designating the fallback.** Every model row carries a mark next to the star
-which sets that route as the fallback; one route at a time, and clicking the
-marked row again clears it. It follows the star's rules: reserved space, revealed
-on hover or keyboard focus, always visible once set. It persists in
-`localStorage` under `dsh.modelPicker.fallback`.
+**Designating fallback models.** The popup footer's **Fallback models** entry opens a manager where you can search for and add multiple models, reorder their priority, or remove them. Failover uses the first available route in that order that differs from the model that just failed. Older single-route settings migrate automatically. The queue persists in `localStorage` under `dsh.modelPicker.fallback`.
 
 **It retires itself.** The failure state is read through the Session's own
 `subscribe`/`getSnapshot` pair, so the button appears the moment the Host reports
@@ -411,8 +407,10 @@ colour changes stay, because they aid comprehension rather than being motion.
   tinted initial, at a curated OKLCH hue. Supplier floors are asserted to keep the
   letter and a distinct hue each, so the two shapes cannot drift into one. The
   settings
-  hand-off is covered the same way: the footer sits outside the scroll area,
-  clicking it writes `models` to the settings seat and closes the popup without
+  hand-off is covered the same way: the footer sits outside the scroll area, its
+  two settings entries share one trailing cluster whose boxes are adjacent and
+  each wears a short label (the full sentence stays in the tooltip), clicking the
+  models entry writes `models` to the settings seat and closes the popup without
   picking a model, the no-store carrier falls back to the `settings.open` command
   plus the ledger's own nav label, and a carrier with no settings UI leaves the
   picker open. The language is asserted against an **English browser**: the copy
@@ -461,7 +459,9 @@ forges the same signed browser-session cookie the host mints — and checks what
 jsdom cannot: the cursor row's computed background, that the search box paints
 its resting border rather than the accent one while it holds focus, that a
 supplier click lands instead of animating, and that the footer's hand-off really
-opens Settings on the Models section. It also measures the first row's avatar in
+opens Settings on the Models section — including that the two settings entries
+land as one adjacent cluster at the popup's trailing edge, which is a real layout
+claim jsdom cannot settle. It also measures the first row's avatar in
 a real browser: the mark must have a non-zero, non-overflowing box, keep its
 `fill-rule="evenodd"` (without it an outline mark like Qwen's fills its own
 counters), paint in a real colour rather than a transparent fill, carry no chip
