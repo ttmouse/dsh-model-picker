@@ -214,6 +214,8 @@ A bare "continue" is deliberately never used, because it reads as new input.
 **Probing a route, and remembering when it last failed.** Every row in that manager carries a **Test connection** button: it sends one tiny prompt through the Host's own model runtime and reports OK with the round trip. When it does not answer, it says more than Failed — **the failure is split into four classes**: `Out of quota`, `Rate limited`, `Auth failed`, and `Timed out`; only what stays unrecognized reads as the generic failure. That split is the point. An exhausted balance and a momentary throttle fail identically and call for opposite responses (top up versus wait), and one "Failed" collapses them into a question the reader has to open a tooltip to answer. The class comes from the harness failure code (`QUOTA` / `ACCOUNT_QUOTA` / `RATE_LIMIT` / `AUTH`), and only when no code names one does the provider's own wording get a say — tested with the Host's own quota classifier, plus Chinese phrasing, because the channels on this machine answer in Chinese. The tooltip carries the sentence and keeps the provider's words as the evidence.
 A route that fails — from that probe, or from a turn that actually died on the model in use — is stamped in `localStorage` under `dsh.modelPicker.failures`, with the time it failed, what said so, **and the class**. Keeping the class is what lets a reopened page still say `Out of quota` instead of degrading to Failed. The model list then wears that time after the model's name: an alert glyph and a clock, the source and the message in the tooltip. The one moment a dead channel is worth knowing about is the moment the next model is being chosen. A probe that answers clears the stamp, and a stamp older than two weeks is dropped on read, so the mark states a recent fact instead of keeping a permanent record. Unlike the vision mark, the pin and the star, it reserves no space — an absent stamp leaves no gap.
 
+**Probing the whole list at once.** The footer's **Check list** button walks the routes the panel is showing right now — a query or a provider facet narrows what gets probed, so "check what's here" is the question that gets asked, not "check all 600 configured models". It is the same probe, one route at a time, so every answer lands in the ledger and the rows grow their marks while the run is still going. Three routes at a time, deliberately: a wide fan-out would answer "is this route dead" by killing healthy channels with 429s of its own making, and the ledger would record the outage it caused. The button is the stop control while it runs (its label becomes `12/659`, tabular so the row cannot jitter), pressing it again ends the run, and closing the panel ends it too — a batch nobody is watching has no business holding request slots. In-flight answers still count into the receipt, which then says `Probed 659/659 · failed 37`, or `stopped …`, and retires itself after a few seconds. The marks are the record; the receipt is only a receipt.
+
 **It retires itself.** The failure state is read through the Session's own
 `subscribe`/`getSnapshot` pair, so the button appears the moment the Host reports
 a failure and disappears the moment `prompt()` clears it — no polling, and no
@@ -445,7 +447,11 @@ colour changes stay, because they aid comprehension rather than being motion.
   record that survives a remount and still shows on the model row, a probe that
   answers clears it, a turn that fails stamps the model it failed on while a
   failure only found in the log stamps nothing, and a stamp past the two-week
-  window never renders at all.
+  window never renders at all. The batch probe is asserted on the same axis: it
+  probes the routes the list is showing — a query narrows what is sent and the
+  rest of the catalog is left alone — every answer lands in the ledger, the
+  button counts while it runs and hands itself back when it ends, and a second
+  click stops the walk with the receipt saying `stopped` rather than `probed`.
 - `scripts/host-route.mjs` drives the real route handler with a stub `llm`:
   asserts the row shape, that a throwing provider/model is isolated, and that
   the 30s cache answers without re-listing. The connection-test route is driven

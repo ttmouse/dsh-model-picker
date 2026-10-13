@@ -1816,6 +1816,78 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   }
 }
 
+// 13k.5. The batch probe walks the list as it is shown, not the whole catalog: a
+//        query narrows what gets probed, every answer lands in the ledger (so the
+//        rows grow their marks while the run is going), the button counts, and a
+//        second click stops instead of starting another run.
+{
+  const realFetch = globalThis.fetch
+  const probed = []
+  const probe = { delay: 0 }
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).includes('/api/model-picker/test')) return realFetch(url, init)
+    const sent = JSON.parse(init.body)
+    const route = sent.provider + '/' + sent.model
+    probed.push(route)
+    if (probe.delay > 0) await new Promise((resolve) => { setTimeout(resolve, probe.delay) })
+    // One route is dead and every other answers, so a run has both sides to count.
+    if (route === 'zhipu/glm-4.6') return { ok: true, json: async () => ({ ok: false, state: 'timeout', error: 'no answer' }) }
+    return { ok: true, json: async () => ({ ok: true, ms: 40 }) }
+  }
+  const settle = async (ms) => { await act(async () => { await new Promise((resolve) => { setTimeout(resolve, ms) }) }) }
+  try {
+    const { host, root } = await failoverMount({}, CLEAN)
+    await act(async () => { host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    const probeButton = () => host.querySelector('.dsh-mp2-footerProbe')
+    const click = async (node) => { await act(async () => { node.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) }) }
+
+    typeInto(host.querySelector('.dsh-mp2-search'), 'GLM-4.6')
+    await act(async () => { await Promise.resolve() })
+    const shown = [...host.querySelectorAll('.dsh-mp2-list .dsh-mp2-modelName')].map((node) => node.textContent)
+    console.log('probe scope   : shown=%s tip=%s', JSON.stringify(shown), JSON.stringify(probeButton().getAttribute('title')))
+    await click(probeButton())
+    await flushProbe()
+    const after = ledgerOf() ?? {}
+    console.log('probe run     : probed=%s ledger=%s', JSON.stringify(probed), JSON.stringify(Object.keys(after)))
+    if (JSON.stringify(probed) !== JSON.stringify(['zhipu/glm-4.6'])) {
+      throw new Error(`a batch must probe the list on screen, not the catalog, got ${JSON.stringify(probed)}`)
+    }
+    if (after['zhipu/glm-4.6']?.state !== 'timeout') throw new Error('the run must land in the ledger')
+    if (host.querySelector('.dsh-mp2-failMark') === null) throw new Error('the row the run failed on must wear the stamp')
+    if (probeButton().textContent !== 'Check list') {
+      throw new Error(`a finished run must hand the button back, got ${JSON.stringify(probeButton().textContent)}`)
+    }
+    if (host.querySelector('.dsh-mp2-probeNote') === null) throw new Error('a finished run must report its tally')
+
+    // Now the whole list, and a stop pressed while it is still going.
+    probe.delay = 8
+    typeInto(host.querySelector('.dsh-mp2-search'), '')
+    await act(async () => { await Promise.resolve() })
+    const total = [...new Set([...host.querySelectorAll('.dsh-mp2-list .dsh-mp2-modelName')]
+      .map((node) => node.textContent))].length
+    probed.length = 0
+    await click(probeButton())
+    await settle(14)
+    const midRun = probeButton().textContent
+    const sentSoFar = probed.length
+    await click(probeButton())
+    await settle(60)
+    console.log('probe stop    : label=%s sent=%d then=%d total=%d note=%s',
+      JSON.stringify(midRun), sentSoFar, probed.length, total, JSON.stringify(host.querySelector('.dsh-mp2-probeNote')?.textContent ?? null))
+    if (!/^\d+\/\d+$/.test(midRun)) throw new Error(`the button must count while running, got ${JSON.stringify(midRun)}`)
+    if (probed.length !== sentSoFar) {
+      throw new Error(`a second click stops the run, but probing continued: ${sentSoFar} → ${probed.length}`)
+    }
+    if (probed.length >= total) throw new Error('the stop must land before the whole list is walked, or the case proves nothing')
+    if (!/stopped/.test(host.querySelector('.dsh-mp2-probeNote')?.textContent ?? '')) {
+      throw new Error('a stopped run must say it stopped, not that it finished')
+    }
+    await act(async () => { root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+}
+
 // 13l. The earlier `{route, enabled}` record still yields its route, so a choice
 //      made before the flag was removed is not lost on this revision.
 {
