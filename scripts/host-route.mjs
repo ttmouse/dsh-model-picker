@@ -279,4 +279,65 @@ console.log('stranded   : models=%s test=%s', JSON.stringify(strandedModels.json
 if (strandedModels.status !== 200 || strandedModels.json.ok !== true) throw new Error('the facts route must outlive its context')
 if (strandedTest.status !== 200 || strandedTest.json.ok !== true) throw new Error('the test route must outlive its context')
 
+// ─── Re-enabling the plugin must not take it down ───
+//
+// The user disables the plugin and enables it again, so the Host calls `apply`
+// a second time. It hands out a fresh `webServer` Proxy while the underlying
+// server still carries the route it accepted the first time, so the second
+// registration collides — and an uncaught throw there failed the whole
+// activation, which is what made the picker disappear on re-enable rather than
+// merely re-registering two routes. Each route must end up served exactly once,
+// and the surviving handler must keep answering: it reads the module state that
+// every apply refreshes, never the disposed context.
+{
+  const served = new Map()
+  const server = {
+    register: (route) => {
+      if (served.has(route.path)) throw new Error(`webserver: duplicate exact route "${route.path}"`)
+      served.set(route.path, route)
+    },
+  }
+  const enable = (service) => host.apply({
+    get(prop) {
+      if (prop === 'llm') return service
+      throw new Error(`cannot get service "${prop}"`)
+    },
+    // A new object every time, exactly as a plugin context behaves.
+    webServer: { register: (route) => server.register(route) },
+  })
+  for (const service of [llm, llm, llm]) {
+    try {
+      enable(service)
+    } catch (error) {
+      throw new Error(`re-enabling the plugin must not fail activation: ${error.message}`)
+    }
+  }
+  const reModels = await call(served.get('/api/model-picker/models'), get)
+  console.log('re-enable  : routes=%d status=%d ok=%s', served.size, reModels.status, JSON.stringify(reModels.json?.ok))
+  if (served.size !== 2) {
+    throw new Error(`each route must be served once after re-enabling, got ${served.size}`)
+  }
+  if (reModels.status !== 200 || reModels.json.ok !== true) {
+    throw new Error('the surviving route must keep answering after a re-enable')
+  }
+
+  // …and a real registration failure must stay loud. Swallowing everything
+  // would hide a server that cannot serve this route at all, which is a
+  // different problem from one that already serves it.
+  let refused = null
+  try {
+    host.apply({
+      get: (prop) => {
+        if (prop === 'llm') return llm
+        throw new Error(`cannot get service "${prop}"`)
+      },
+      webServer: { register: () => { throw new Error('webserver: route table is full') } },
+    })
+  } catch (error) {
+    refused = error
+  }
+  if (refused === null) throw new Error('a non-duplicate registration failure must still propagate')
+  console.log('route refuse: %s', JSON.stringify(refused.message))
+}
+
 console.log('HOST ROUTE OK')
