@@ -1816,10 +1816,13 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   }
 }
 
-// 13k.5. The batch probe walks the list as it is shown, not the whole catalog: a
-//        query narrows what gets probed, every answer lands in the ledger (so the
-//        rows grow their marks while the run is going), the button counts, and a
-//        second click stops instead of starting another run.
+// 13k.5. What "check the list" covers. The scope follows the right column: a query
+//        means the models it found, and no query means one representative per
+//        provider instead of the whole catalog — on this machine a thousand routes
+//        across twenty providers, where the failures that matter are per channel.
+//        Every answer lands in the ledger (so the rows grow their marks while the
+//        run is going), the button counts, and a second click stops rather than
+//        starting another run.
 {
   const realFetch = globalThis.fetch
   const probed = []
@@ -1854,35 +1857,85 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     }
     if (after['zhipu/glm-4.6']?.state !== 'timeout') throw new Error('the run must land in the ledger')
     if (host.querySelector('.dsh-mp2-failMark') === null) throw new Error('the row the run failed on must wear the stamp')
-    if (probeButton().textContent !== 'Check list') {
-      throw new Error(`a finished run must hand the button back, got ${JSON.stringify(probeButton().textContent)}`)
+    if (probeButton().textContent !== 'Check 1 model') {
+      throw new Error(`a finished filtered run must hand the button back with its count, got ${JSON.stringify(probeButton().textContent)}`)
     }
     if (host.querySelector('.dsh-mp2-probeNote') === null) throw new Error('a finished run must report its tally')
 
-    // Now the whole list, and a stop pressed while it is still going.
-    probe.delay = 8
+    // ── With no query the scope is the providers, not the thousand routes ──
+    probed.length = 0
     typeInto(host.querySelector('.dsh-mp2-search'), '')
     await act(async () => { await Promise.resolve() })
-    const total = [...new Set([...host.querySelectorAll('.dsh-mp2-list .dsh-mp2-modelName')]
-      .map((node) => node.textContent))].length
+    const listed = host.querySelectorAll('.dsh-mp2-list .dsh-mp2-modelName').length
+    const providerTip = probeButton().getAttribute('title')
+    console.log('probe providers: listed=%d label=%s tip=%s', listed, JSON.stringify(probeButton().textContent), JSON.stringify(providerTip))
+    if (probeButton().textContent !== 'Check 3 providers') {
+      throw new Error(`the unfiltered panel must count providers, got ${JSON.stringify(probeButton().textContent)}`)
+    }
+    if (!/representative model/.test(providerTip ?? '')) {
+      throw new Error('the tooltip must say what stands in for a provider')
+    }
+    if (listed <= 3) throw new Error('the fixture must list far more models than providers, or this case proves nothing')
+    await click(probeButton())
+    await flushProbe()
+    const note = host.querySelector('.dsh-mp2-probeNote')
+    console.log('probe canaries : probed=%s note=%s title=%s', JSON.stringify(probed),
+      JSON.stringify(note?.textContent ?? null), JSON.stringify(note?.getAttribute('title') ?? null))
+    // DeepSeek's stand-in is `deepseek-reasoner` rather than the first model it
+    // lists, because the panel records the directory's current model as history:
+    // the route in use is the one that speaks for the channel being judged.
+    if (JSON.stringify(probed) !== JSON.stringify(['deepseek/deepseek-reasoner', 'zhipu/glm-4.6', '17an/qwen3-max'])) {
+      throw new Error(`the unfiltered run must probe one route per provider, got ${JSON.stringify(probed)}`)
+    }
+    if (!/Checked 3\/3 · failed 1/.test(note?.textContent ?? '')) {
+      throw new Error(`the receipt must count the run, got ${JSON.stringify(note?.textContent ?? null)}`)
+    }
+    if (!/智谱 GLM/.test(note?.getAttribute('title') ?? '')) {
+      throw new Error(`the receipt must name the provider that failed, got ${JSON.stringify(note?.getAttribute('title') ?? null)}`)
+    }
+    await act(async () => { root.unmount() })
+
+    // ── The canary is the route the reader would actually reach for ──
+    // `17an/default-model` is the last model under its provider, so the
+    // first-listed rule could never pick it: only the star can explain this.
+    const starred = await failoverMount({ 'dsh.modelPicker.favorites': JSON.stringify(['17an/default-model']) }, CLEAN)
+    await act(async () => { starred.host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
     probed.length = 0
-    await click(probeButton())
-    await settle(14)
-    const midRun = probeButton().textContent
+    await click(starred.host.querySelector('.dsh-mp2-footerProbe'))
+    await flushProbe()
+    console.log('probe starred  : probed=%s', JSON.stringify(probed))
+    if (!probed.includes('17an/default-model')) {
+      throw new Error(`a starred model must stand in for its provider, got ${JSON.stringify(probed)}`)
+    }
+    if (probed.length !== 3) throw new Error(`still one route per provider, got ${JSON.stringify(probed)}`)
+    await act(async () => { starred.root.unmount() })
+
+    // ── A second click stops, rather than starting another run ──
+    const stopping = await failoverMount({}, CLEAN)
+    await act(async () => { stopping.host.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    probe.delay = 80
+    typeInto(stopping.host.querySelector('.dsh-mp2-search'), 'deepseek')
+    await act(async () => { await Promise.resolve() })
+    const stopButton = () => stopping.host.querySelector('.dsh-mp2-footerProbe')
+    const total = stopping.host.querySelectorAll('.dsh-mp2-list .dsh-mp2-modelName').length
+    probed.length = 0
+    await click(stopButton())
+    await settle(30)
+    const midRun = stopButton().textContent
     const sentSoFar = probed.length
-    await click(probeButton())
-    await settle(60)
-    console.log('probe stop    : label=%s sent=%d then=%d total=%d note=%s',
-      JSON.stringify(midRun), sentSoFar, probed.length, total, JSON.stringify(host.querySelector('.dsh-mp2-probeNote')?.textContent ?? null))
+    await click(stopButton())
+    await settle(300)
+    console.log('probe stop     : label=%s sent=%d then=%d total=%d note=%s',
+      JSON.stringify(midRun), sentSoFar, probed.length, total, JSON.stringify(stopping.host.querySelector('.dsh-mp2-probeNote')?.textContent ?? null))
     if (!/^\d+\/\d+$/.test(midRun)) throw new Error(`the button must count while running, got ${JSON.stringify(midRun)}`)
     if (probed.length !== sentSoFar) {
       throw new Error(`a second click stops the run, but probing continued: ${sentSoFar} → ${probed.length}`)
     }
-    if (probed.length >= total) throw new Error('the stop must land before the whole list is walked, or the case proves nothing')
-    if (!/stopped/.test(host.querySelector('.dsh-mp2-probeNote')?.textContent ?? '')) {
+    if (probed.length >= total) throw new Error('the stop must land before the whole scope is walked, or the case proves nothing')
+    if (!/stopped/.test(stopping.host.querySelector('.dsh-mp2-probeNote')?.textContent ?? '')) {
       throw new Error('a stopped run must say it stopped, not that it finished')
     }
-    await act(async () => { root.unmount() })
+    await act(async () => { stopping.root.unmount() })
   } finally {
     globalThis.fetch = realFetch
   }
