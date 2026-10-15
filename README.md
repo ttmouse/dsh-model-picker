@@ -494,6 +494,18 @@ default; `DSH_LIVE_ORIGIN=http://127.0.0.1:19387` points it at the desktop app
 instead, which serves its own installed copy of `lib/client.js` — a change has to
 be carried into that profile before the run can see it.
 
+`node scripts/verify-served.mjs` answers a different and more annoying question:
+is the running desktop app actually serving the build I just copied into it? It
+compares the profile's `lib/client.js` with the checkout, then fetches the plugin
+bundles the app hands the browser and looks for markers only the new build has.
+This matters because the app is not reading that file per request — it builds a
+bundle, serves it `immutable` for a year behind a `rev`-stamped URL, and the
+concatenated bundle lags one page load behind the file: measured on this machine,
+the first load after a copy still served the previous build and the second served
+the new one. So "hit refresh and look" can show nothing, twice over. When the
+check reports the marker missing, the answer is to reload again or restart the
+app — never to conclude the code did not work.
+
 `node scripts/screenshot.mjs` regenerates the README image. It stars two models
 from different suppliers first — the favorites group is the feature a still image
 has to show, and it is empty on a fresh browser profile — and refuses to write a
