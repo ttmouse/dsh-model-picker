@@ -1,0 +1,56 @@
+{
+ "startedAt": "2026-10-12T15:25:44",
+ "providers": {
+  "zai-coding-cn": [
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-4.6v",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.96,
+    "verdict": "rate-limit",
+    "message": "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.68,
+    "verdict": "rate-limit",
+    "message": "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-5.3-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.67,
+    "verdict": "rate-limit",
+    "message": "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-5.3-highspeed",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.31,
+    "verdict": "rate-limit",
+    "message": "Your current subscription plan does not yet include access to GLM-5.3-Highspeed",
+    "snippet": "",
+    "usage": {}
+   }
+  ]
+ },
+ "discovery": {}
+}

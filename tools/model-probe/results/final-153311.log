@@ -1,0 +1,129 @@
+== opencode-go1
+  !! deepseek-v4-pro                        no-key               0s 
+  !! deepseek-flash                         no-key               0s 
+  !! deepseek-v4-flash                      no-key               0s 
+  !! deepseek-v4.1-flash                    no-key               0s 
+  !! deepseek-v4-flash-vision-exp           no-key               0s 
+== commandcode
+  !! deepseek/deepseek-v4-flash             http-400          0.77s You have insufficient credits to make this request. Please purchase more credits
+  !! deepseek/deepseek-v4-pro               http-400          0.79s You have insufficient credits to make this request. Please purchase more credits
+  !! MiniMaxAI/MiniMax-M3                   http-400          0.99s You have insufficient credits to make this request. Please purchase more credits
+== yqa
+  OK deepseek-v4.1-flash                    ok                1.31s 
+  OK glm-5.3-flash                          ok                3.54s 
+== yqa-anbot
+  OK deepseek-v4.1-flash                    ok                1.05s 
+== yqa-mumiao
+  !! hy3                                    auth              0.29s The current API Key is not authorized to access model hy3. Please check the key 
+  OK deepseek-v4-flash-202605               ok                0.91s 
+  OK deepseek/deepseek-v4-flash-vision-exp  ok                1.08s 
+  OK claude-opus-4-6                        ok                1.44s 
+  OK deepseek-v4-flash                      ok                1.97s 
+  OK deepseek-v4-pro                        ok                2.19s 
+  OK claude-opus-4-6-max                    ok                2.86s 
+== qwen-token-plan-cn
+  !! deepseek-v4-flash                      auth              0.25s Access to model denied. Please make sure you are eligible for using the model.
+  !! glm-5.3                                auth              0.26s Access to model denied. Please make sure you are eligible for using the model.
+  !! deepseek-v4-pro                        auth              0.26s Access to model denied. Please make sure you are eligible for using the model.
+  !! deepseek-v4-pro-0813                   auth              0.29s Access to model denied. Please make sure you are eligible for using the model.
+  !! deepseek-v4.1-flash                    auth              0.31s Access to model denied. Please make sure you are eligible for using the model.
+  !! kimi-k2.5                              auth              0.33s Access to model denied. Please make sure you are eligible for using the model.
+  !! deepseek-v4-flash-0731                 auth              0.33s Access to model denied. Please make sure you are eligible for using the model.
+== zai-coding-cn
+  !! glm-5.3-flash                          rate-limit        1.57s Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13
+  !! glm-5.3                                rate-limit        1.75s Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13
+  !! glm-4.6v                               rate-limit        2.13s Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13
+  !! glm-5.3-highspeed                      rate-limit        2.33s Your current subscription plan does not yet include access to GLM-5.3-Highspeed
+== magpie
+  !! group/auto-deepseek-v4-1-flash         rate-limit        1.03s WorkBuddy: 您的使用量已超出频率限制，将在 2026-10-12 20:48:22 UTC+8 重置，您也可以切换其他模型继续使用。
+  !! 17an-db/deepseek-v4.1-flash            auth              0.09s 17an-DB: 订阅额度不足或未配置订阅: subscription quota insufficient, need=84 (request id: 202
+  OK group/auto-auto                        ok                4.44s 
+  !! zhipu/glm-5.3-flash                    rate-limit        7.67s Zhipu GLM: 您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。
+  !! zhipu/glm-5.3                          rate-limit        7.67s Zhipu GLM: 您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。
+  OK group/auto-grok-4-5                    ok                7.85s 
+  OK group/auto-hy3                         ok                7.85s 
+  OK group/auto-grok-4-7-500k               ok                9.08s 
+  OK group/auto-glm-5-3                     ok                9.45s 
+  OK group/auto-grok-4-6                    ok                9.81s 
+  OK group/auto-glm-5-3-flash               ok               11.17s 
+  OK cursor/auto                            ok                6.91s 
+  OK cursor/grok-4.7@256k                   ok                7.06s 
+  OK cursor/grok-4.7@500k                   ok                6.21s 
+  OK cursor/claude-opus-5-5@300k            ok                5.79s 
+  OK cursor/claude-opus-5@300k              ok                4.36s 
+  OK cursor/claude-opus-5@1m                ok                4.67s 
+  OK cursor/claude-opus-5-5@1m              ok                5.42s 
+  OK cursor/grok-4.6                        ok               15.02s 
+  OK cursor/claude-opus-4-8@300k            ok                9.46s 
+  OK cursor/gpt-5.6-sol@1m                  ok                6.79s 
+  OK cursor/claude-opus-4-8@1m              ok                8.07s 
+  OK cursor/gpt-5.6-sol@272k                ok                7.83s 
+  OK cursor/gpt-5.5@272k                    ok                5.96s 
+  OK cursor/gpt-5.5@1m                      ok                5.45s 
+  OK cursor/claude-fable-5-1@300k           ok                6.27s 
+  OK cursor/claude-fable-5-1@1m             ok                5.89s 
+  OK cursor/claude-fable-5@300k             ok                6.29s 
+  OK cursor/claude-fable-5@1m               ok                6.86s 
+  OK cursor/grok-4.5                        ok                7.17s 
+  OK cursor/gemini-3.7-flash                ok                7.03s 
+  OK cursor/muse-spark-1.3@300k             ok                6.81s 
+  OK cursor/gemini-3.8-flash                ok                8.22s 
+  OK codex/gpt-6.1-sol                      ok               37.51s 
+  OK grok/grok-4.7                          ok                3.62s 
+  OK cursor/muse-spark-1.3@1m               ok                6.59s 
+  OK codex/gpt-6-astra                      ok               42.89s 
+  OK cursor/composer-2.5                    ok               34.62s 
+  OK grok/grok-4.7-build-fast               ok                6.47s 
+  OK grok/grok-4.7@500k                     ok                7.49s 
+  OK grok/grok-4.7-build-fast@500k          ok                6.43s 
+  OK grok/grok-4.6@500k                     ok                5.23s 
+  OK workbuddy/hy3                          ok                1.91s 
+  OK grok/grok-4.5@500k                     ok                5.79s 
+  OK grok/grok-4.5                          ok                5.94s 
+  !! workbuddy/deepseek-v4.1-flash          rate-limit        0.59s WorkBuddy: 您的使用量已超出频率限制，将在 2026-10-12 20:48:22 UTC+8 重置，您也可以切换其他模型继续使用。
+  OK workbuddy/hy3-x                        ok                2.08s 
+  OK workbuddy/hy4-preview-f                ok                4.22s 
+  OK workbuddy/auto                         ok                4.32s 
+  !! codex/gpt-6-sol                        timeout           45.0s 
+  !! codex/gpt-6-luna                       timeout           45.0s 
+  !! zcode/GLM-5.3-Flash                    rate-limit        8.65s ZCode: [1310][您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。][20261012153415929aef
+  OK workbuddy/glm-5v-turbo                 ok                1.56s 
+  OK workbuddy/glm-5.2                      ok                2.17s 
+  OK grok/grok-4.6                          ok               12.12s 
+  OK workbuddy/minimax-m3                   ok                1.67s 
+  OK workbuddy/glm-5.3-flash                ok                5.16s 
+  OK workbuddy/glm-5.1                      ok                3.73s 
+  OK workbuddy/deepseek-v4-pro              ok                1.79s 
+  !! zcode/GLM-5.3                          rate-limit        8.52s ZCode: [1310][您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。][20261012153418ce5677
+  OK workbuddy/kimi-k2.7                    ok                3.02s 
+  OK workbuddy/space-bunny                  ok                3.17s 
+  OK workbuddy/kimi-k3-1                    ok                5.14s 
+  OK workbuddy/glm-5.3                      ok               10.76s 
+  OK workbuddy-ai/hy3                       ok                5.34s 
+  OK workbuddy-ai/default-model             ok                 6.7s 
+  OK workbuddy/kimi-k2.6                    ok                9.75s 
+  OK qoder/qfmodel                          ok                8.71s 
+  OK workbuddy-ai/glm-5.3                   ok                9.41s 
+  OK workbuddy/kimi-k2.8-preview            ok               10.41s 
+  OK qoder/gmodel                           ok               11.38s 
+  OK workbuddy/hy4-preview                  ok               16.76s 
+  OK qoder/dfmodel                          ok                9.84s 
+  OK qoder/gfmodel                          ok               16.33s 
+  OK qoder/dmodel                           ok               15.62s 
+  OK opencode-zen-free/big-pickle           ok               16.45s 
+  OK opencode-zen-free/mimo-v2.6-flash-free ok                41.1s 
+  !! opencode-zen-free/ling-3.1-flash-free  timeout           45.0s 
+  !! opencode-zen-free/muse-spark-1.3-contributor-free timeout           45.0s 
+  !! opencode-zen-free/nemotron-3.5-lightning-free timeout           45.0s 
+  !! opencode-zen-free/step-5-preview-free  timeout           45.0s 
+  !! opencode-zen-free/longcat-2.5-preview-free timeout           45.0s 
+  !! opencode-zen-free/space-bunny-free     timeout           45.0s 
+  discovery: 83 models via /models
+== magpie-responses
+  OK grok/grok-4.7                          ok                5.06s 
+  OK codex/gpt-6-astra                      ok               25.24s 
+== magpie-anthropic
+  !! zcode/GLM-5.3-Flash                    rate-limit        8.77s ZCode: [1310][您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。][20261012153552581d9e
+  !! zcode/GLM-5.3                          rate-limit        8.77s ZCode: [1310][您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。][202610121535526d7285
+
+79/116 ok -> results/liveness-final.json

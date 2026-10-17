@@ -1,0 +1,1665 @@
+{
+ "startedAt": "2026-10-12T15:33:11",
+ "providers": {
+  "opencode-go1": [
+   {
+    "provider": "opencode-go1",
+    "model": "deepseek-flash",
+    "api": "chat",
+    "keyPresent": false,
+    "status": null,
+    "verdict": "no-key",
+    "seconds": 0,
+    "message": ""
+   },
+   {
+    "provider": "opencode-go1",
+    "model": "deepseek-v4-flash",
+    "api": "chat",
+    "keyPresent": false,
+    "status": null,
+    "verdict": "no-key",
+    "seconds": 0,
+    "message": ""
+   },
+   {
+    "provider": "opencode-go1",
+    "model": "deepseek-v4-flash-vision-exp",
+    "api": "chat",
+    "keyPresent": false,
+    "status": null,
+    "verdict": "no-key",
+    "seconds": 0,
+    "message": ""
+   },
+   {
+    "provider": "opencode-go1",
+    "model": "deepseek-v4-pro",
+    "api": "chat",
+    "keyPresent": false,
+    "status": null,
+    "verdict": "no-key",
+    "seconds": 0,
+    "message": ""
+   },
+   {
+    "provider": "opencode-go1",
+    "model": "deepseek-v4.1-flash",
+    "api": "chat",
+    "keyPresent": false,
+    "status": null,
+    "verdict": "no-key",
+    "seconds": 0,
+    "message": ""
+   }
+  ],
+  "commandcode": [
+   {
+    "provider": "commandcode",
+    "model": "MiniMaxAI/MiniMax-M3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 400,
+    "seconds": 0.99,
+    "verdict": "http-400",
+    "message": "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "commandcode",
+    "model": "deepseek/deepseek-v4-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 400,
+    "seconds": 0.77,
+    "verdict": "http-400",
+    "message": "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "commandcode",
+    "model": "deepseek/deepseek-v4-pro",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 400,
+    "seconds": 0.79,
+    "verdict": "http-400",
+    "message": "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    "snippet": "",
+    "usage": {}
+   }
+  ],
+  "yqa": [
+   {
+    "provider": "yqa",
+    "model": "deepseek-v4.1-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.31,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 37,
+     "completion_tokens": 16
+    }
+   },
+   {
+    "provider": "yqa",
+    "model": "glm-5.3-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 3.54,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "",
+    "usage": {
+     "prompt_tokens": 19,
+     "completion_tokens": 64
+    }
+   }
+  ],
+  "yqa-anbot": [
+   {
+    "provider": "yqa-anbot",
+    "model": "deepseek-v4.1-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.05,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 37,
+     "completion_tokens": 28
+    }
+   }
+  ],
+  "yqa-mumiao": [
+   {
+    "provider": "yqa-mumiao",
+    "model": "claude-opus-4-6",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.44,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 90,
+     "completion_tokens": 15
+    }
+   },
+   {
+    "provider": "yqa-mumiao",
+    "model": "claude-opus-4-6-max",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 2.86,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 90,
+     "completion_tokens": 44
+    }
+   },
+   {
+    "provider": "yqa-mumiao",
+    "model": "deepseek-v4-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.97,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 90,
+     "completion_tokens": 15
+    }
+   },
+   {
+    "provider": "yqa-mumiao",
+    "model": "deepseek-v4-flash-202605",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 0.91,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 37,
+     "completion_tokens": 33
+    }
+   },
+   {
+    "provider": "yqa-mumiao",
+    "model": "deepseek-v4-pro",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 2.19,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 11,
+     "completion_tokens": 26
+    }
+   },
+   {
+    "provider": "yqa-mumiao",
+    "model": "deepseek/deepseek-v4-flash-vision-exp",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.08,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 37,
+     "completion_tokens": 32
+    }
+   },
+   {
+    "provider": "yqa-mumiao",
+    "model": "hy3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.29,
+    "verdict": "auth",
+    "message": "The current API Key is not authorized to access model hy3. Please check the key access scope on the API Key management page in the console. See: https://***.com/***/***",
+    "snippet": "",
+    "usage": {}
+   }
+  ],
+  "qwen-token-plan-cn": [
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "deepseek-v4-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.25,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "deepseek-v4-flash-0731",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.33,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "deepseek-v4-pro",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.26,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "deepseek-v4-pro-0813",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.29,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "deepseek-v4.1-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.31,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "glm-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.26,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "qwen-token-plan-cn",
+    "model": "kimi-k2.5",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.33,
+    "verdict": "auth",
+    "message": "Access to model denied. Please make sure you are eligible for using the model.",
+    "snippet": "",
+    "usage": {}
+   }
+  ],
+  "zai-coding-cn": [
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-4.6v",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 2.13,
+    "verdict": "rate-limit",
+    "message": "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.75,
+    "verdict": "rate-limit",
+    "message": "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-5.3-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.57,
+    "verdict": "rate-limit",
+    "message": "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-14 11:30:13",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "zai-coding-cn",
+    "model": "glm-5.3-highspeed",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 2.33,
+    "verdict": "rate-limit",
+    "message": "Your current subscription plan does not yet include access to GLM-5.3-Highspeed",
+    "snippet": "",
+    "usage": {}
+   }
+  ],
+  "magpie": [
+   {
+    "provider": "magpie",
+    "model": "17an-db/deepseek-v4.1-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 403,
+    "seconds": 0.09,
+    "verdict": "auth",
+    "message": "17an-DB: \u8ba2\u9605\u989d\u5ea6\u4e0d\u8db3\u6216\u672a\u914d\u7f6e\u8ba2\u9605: subscription quota insufficient, need=84 (request id: 202610120733241452585048268d9d6o3bIA1qr)",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie",
+    "model": "codex/gpt-6-astra",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 42.89,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 4165,
+     "completion_tokens": 5
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "codex/gpt-6-luna",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 57.88,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 3537,
+     "completion_tokens": 5
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "codex/gpt-6-sol",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 62.41,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 3716,
+     "completion_tokens": 5
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "codex/gpt-6.1-sol",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 37.51,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 4229,
+     "completion_tokens": 5
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/auto",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.91,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 18,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-fable-5-1@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.89,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 18,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-fable-5-1@300k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.27,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 18,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-fable-5@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.86,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 16,
+     "completion_tokens": 13
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-fable-5@300k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.29,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 16,
+     "completion_tokens": 10
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-opus-4-8@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 8.07,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 16,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-opus-4-8@300k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.46,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 16,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-opus-5-5@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.42,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 18,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-opus-5-5@300k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.79,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 18,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-opus-5@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 4.67,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 16,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/claude-opus-5@300k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 4.36,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 16,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/composer-2.5",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 34.62,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "Verifying the skill and locating the task zip branch for a full file review.\n\n[Tool call] Glob\n  target_directory: /User",
+    "usage": {
+     "prompt_tokens": 504,
+     "completion_tokens": 1463
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/gemini-3.7-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.03,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 7,
+     "completion_tokens": 1
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/gemini-3.8-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 8.22,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 7,
+     "completion_tokens": 1
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/gpt-5.5@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.45,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 13,
+     "completion_tokens": 18
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/gpt-5.5@272k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.96,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 13,
+     "completion_tokens": 18
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/gpt-5.6-sol@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.79,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 13,
+     "completion_tokens": 5
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/gpt-5.6-sol@272k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.83,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 13,
+     "completion_tokens": 5
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/grok-4.5",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.17,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 230
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/grok-4.6",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 15.02,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok\n\\confidence{100}",
+    "usage": {
+     "prompt_tokens": 25,
+     "completion_tokens": 485
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/grok-4.7@256k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.06,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 52
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/grok-4.7@500k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.21,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 34
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/muse-spark-1.3@1m",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.59,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 14,
+     "completion_tokens": 302
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "cursor/muse-spark-1.3@300k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.81,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 14,
+     "completion_tokens": 137
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.5",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.94,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 213,
+     "completion_tokens": 91
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.5@500k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.79,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 213,
+     "completion_tokens": 92
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.6",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 12.12,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 213,
+     "completion_tokens": 186
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.6@500k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.23,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 213,
+     "completion_tokens": 85
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.7",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 3.62,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 33
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.7-build-fast",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.47,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 33
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.7-build-fast@500k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.43,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 54
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "grok/grok-4.7@500k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.49,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 51
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-auto",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 4.44,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 18,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-deepseek-v4-1-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 1.03,
+    "verdict": "rate-limit",
+    "message": "WorkBuddy: \u60a8\u7684\u4f7f\u7528\u91cf\u5df2\u8d85\u51fa\u9891\u7387\u9650\u5236\uff0c\u5c06\u5728 2026-10-12 20:48:22 UTC+8 \u91cd\u7f6e\uff0c\u60a8\u4e5f\u53ef\u4ee5\u5207\u6362\u5176\u4ed6\u6a21\u578b\u7ee7\u7eed\u4f7f\u7528\u3002",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-glm-5-3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.45,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-glm-5-3-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 11.17,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-grok-4-5",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.85,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 92
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-grok-4-6",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.81,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 25,
+     "completion_tokens": 88
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-grok-4-7-500k",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.08,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 1249,
+     "completion_tokens": 60
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "group/auto-hy3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 7.85,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 25,
+     "completion_tokens": 16
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/big-pickle",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 16.45,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 439,
+     "completion_tokens": 2
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/ling-3.1-flash-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 16.92,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 475,
+     "completion_tokens": 16
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/longcat-2.5-preview-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 51.55,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 273,
+     "completion_tokens": 23
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/mimo-v2.6-flash-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 41.1,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 287,
+     "completion_tokens": 15
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/muse-spark-1.3-contributor-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 84.48,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "None",
+    "usage": {
+     "prompt_tokens": 685,
+     "completion_tokens": 64
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/nemotron-3.5-lightning-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 35.64,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "None",
+    "usage": {
+     "prompt_tokens": 413,
+     "completion_tokens": 64
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/space-bunny-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 65.31,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 547,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "opencode-zen-free/step-5-preview-free",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 58.82,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 438,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "qoder/dfmodel",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.84,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 59,
+     "completion_tokens": 31
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "qoder/dmodel",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 15.62,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 125,
+     "completion_tokens": 13
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "qoder/gfmodel",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 16.33,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 42,
+     "completion_tokens": 35
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "qoder/gmodel",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 11.38,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 42,
+     "completion_tokens": 16
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "qoder/qfmodel",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 8.71,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 44,
+     "completion_tokens": 32
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy-ai/default-model",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 6.7,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 20,
+     "completion_tokens": 1
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy-ai/glm-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.41,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy-ai/hy3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.34,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 25,
+     "completion_tokens": 55
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/auto",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 4.32,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 74,
+     "completion_tokens": 63
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/deepseek-v4-pro",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.79,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 17,
+     "completion_tokens": 1
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/deepseek-v4.1-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 0.59,
+    "verdict": "rate-limit",
+    "message": "WorkBuddy: \u60a8\u7684\u4f7f\u7528\u91cf\u5df2\u8d85\u51fa\u9891\u7387\u9650\u5236\uff0c\u5c06\u5728 2026-10-12 20:48:22 UTC+8 \u91cd\u7f6e\uff0c\u60a8\u4e5f\u53ef\u4ee5\u5207\u6362\u5176\u4ed6\u6a21\u578b\u7ee7\u7eed\u4f7f\u7528\u3002",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/glm-5.1",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 3.73,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "None",
+    "usage": {
+     "prompt_tokens": 19,
+     "completion_tokens": 64
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/glm-5.2",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 2.17,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 20,
+     "completion_tokens": 1
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/glm-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 10.76,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/glm-5.3-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.16,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 26,
+     "completion_tokens": 3
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/glm-5v-turbo",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.56,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 19,
+     "completion_tokens": 2
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/hy3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.91,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 25,
+     "completion_tokens": 16
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/hy3-x",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 2.08,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 25,
+     "completion_tokens": 57
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/hy4-preview",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 16.76,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "None",
+    "usage": {
+     "prompt_tokens": 74,
+     "completion_tokens": 64
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/hy4-preview-f",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 4.22,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "None",
+    "usage": {
+     "prompt_tokens": 74,
+     "completion_tokens": 64
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/kimi-k2.6",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 9.75,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 24,
+     "completion_tokens": 4
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/kimi-k2.7",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 3.02,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 24,
+     "completion_tokens": 14
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/kimi-k2.8-preview",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 10.41,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 110,
+     "completion_tokens": 44
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/kimi-k3-1",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.14,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 110,
+     "completion_tokens": 45
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/minimax-m3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 1.67,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 170,
+     "completion_tokens": 2
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "workbuddy/space-bunny",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 3.17,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "ok",
+    "usage": {
+     "prompt_tokens": 163,
+     "completion_tokens": 2
+    }
+   },
+   {
+    "provider": "magpie",
+    "model": "zcode/GLM-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 8.52,
+    "verdict": "rate-limit",
+    "message": "ZCode: [1310][\u60a8\u5df2\u8fbe\u5230\u6bcf\u5468/\u6bcf\u6708\u4f7f\u7528\u4e0a\u9650\uff0c\u60a8\u7684\u9650\u989d\u5c06\u5728 2026-10-14 11:30:13 \u91cd\u7f6e\u3002][20261012153418ce5677c8f0b04397]",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie",
+    "model": "zcode/GLM-5.3-Flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 8.65,
+    "verdict": "rate-limit",
+    "message": "ZCode: [1310][\u60a8\u5df2\u8fbe\u5230\u6bcf\u5468/\u6bcf\u6708\u4f7f\u7528\u4e0a\u9650\uff0c\u60a8\u7684\u9650\u989d\u5c06\u5728 2026-10-14 11:30:13 \u91cd\u7f6e\u3002][20261012153415929aef096fb249b5]",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie",
+    "model": "zhipu/glm-5.3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 7.67,
+    "verdict": "rate-limit",
+    "message": "Zhipu GLM: \u60a8\u5df2\u8fbe\u5230\u6bcf\u5468/\u6bcf\u6708\u4f7f\u7528\u4e0a\u9650\uff0c\u60a8\u7684\u9650\u989d\u5c06\u5728 2026-10-14 11:30:13 \u91cd\u7f6e\u3002",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie",
+    "model": "zhipu/glm-5.3-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 7.67,
+    "verdict": "rate-limit",
+    "message": "Zhipu GLM: \u60a8\u5df2\u8fbe\u5230\u6bcf\u5468/\u6bcf\u6708\u4f7f\u7528\u4e0a\u9650\uff0c\u60a8\u7684\u9650\u989d\u5c06\u5728 2026-10-14 11:30:13 \u91cd\u7f6e\u3002",
+    "snippet": "",
+    "usage": {}
+   }
+  ],
+  "magpie-responses": [
+   {
+    "provider": "magpie-responses",
+    "model": "codex/gpt-6-astra",
+    "api": "responses",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 25.24,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "[{\"content\": [{\"annotations\": [], \"text\": \"ok\", \"type\": \"output_text\"}], \"id\": \"msg_18ddb801bbac70e000000007\", \"role\": \"",
+    "usage": {}
+   },
+   {
+    "provider": "magpie-responses",
+    "model": "grok/grok-4.7",
+    "api": "responses",
+    "keyPresent": true,
+    "status": 200,
+    "seconds": 5.06,
+    "verdict": "ok",
+    "message": "",
+    "snippet": "[{\"id\": \"rs_f47df4cf-dca0-9481-a28a-c1ccd1efe556\", \"summary\": [{\"text\": \"The user requested a single-word reply: \\\"ok\\\".",
+    "usage": {}
+   }
+  ],
+  "magpie-anthropic": [
+   {
+    "provider": "magpie-anthropic",
+    "model": "zcode/GLM-5.3",
+    "api": "messages",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 8.77,
+    "verdict": "rate-limit",
+    "message": "ZCode: [1310][\u60a8\u5df2\u8fbe\u5230\u6bcf\u5468/\u6bcf\u6708\u4f7f\u7528\u4e0a\u9650\uff0c\u60a8\u7684\u9650\u989d\u5c06\u5728 2026-10-14 11:30:13 \u91cd\u7f6e\u3002][202610121535526d72854164eb4bc4]",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "magpie-anthropic",
+    "model": "zcode/GLM-5.3-Flash",
+    "api": "messages",
+    "keyPresent": true,
+    "status": 429,
+    "seconds": 8.77,
+    "verdict": "rate-limit",
+    "message": "ZCode: [1310][\u60a8\u5df2\u8fbe\u5230\u6bcf\u5468/\u6bcf\u6708\u4f7f\u7528\u4e0a\u9650\uff0c\u60a8\u7684\u9650\u989d\u5c06\u5728 2026-10-14 11:30:13 \u91cd\u7f6e\u3002][20261012153552581d9e80b40249e5]",
+    "snippet": "",
+    "usage": {}
+   }
+  ]
+ },
+ "discovery": {
+  "magpie": "83 models via /models"
+ }
+}

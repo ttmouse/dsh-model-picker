@@ -6,3 +6,13 @@ live-*.png
 
 # Plugin-runtime state written by the harness, not by this repo.
 .dsh/
+
+# The doc-review sidecar's scratch dir (see skills/doc-review):批注与提案的落盘位置，
+# 工具产物而非项目内容。批注真源在 ~/.dsh，不在这里。
+.dsh-review/
+
+# Probe byproducts that are not the README image: ad-hoc captures from debugging.
+screenshot-popup.png
+
+# Python bytecode from tools/model-probe.
+__pycache__/

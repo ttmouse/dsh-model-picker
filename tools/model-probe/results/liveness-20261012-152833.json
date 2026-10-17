@@ -1,0 +1,44 @@
+{
+ "startedAt": "2026-10-12T15:28:26",
+ "providers": {
+  "commandcode": [
+   {
+    "provider": "commandcode",
+    "model": "MiniMaxAI/MiniMax-M3",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 400,
+    "seconds": 7.0,
+    "verdict": "http-400",
+    "message": "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "commandcode",
+    "model": "deepseek/deepseek-v4-flash",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 400,
+    "seconds": 6.82,
+    "verdict": "http-400",
+    "message": "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    "snippet": "",
+    "usage": {}
+   },
+   {
+    "provider": "commandcode",
+    "model": "deepseek/deepseek-v4-pro",
+    "api": "chat",
+    "keyPresent": true,
+    "status": 400,
+    "seconds": 6.82,
+    "verdict": "http-400",
+    "message": "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    "snippet": "",
+    "usage": {}
+   }
+  ]
+ },
+ "discovery": {}
+}

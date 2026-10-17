@@ -1,0 +1,87 @@
+== magpie
+  !! group/auto-deepseek-v4-1-flash         auth              1.48s 17an-DB: 订阅额度不足或未配置订阅: subscription quota insufficient, need=84 (request id: 202
+  !! 17an-db/deepseek-v4.1-flash            auth              0.43s 17an-DB: 订阅额度不足或未配置订阅: subscription quota insufficient, need=84 (request id: 202
+  OK group/auto-glm-5-3-flash               ok                2.53s 
+  OK group/auto-hy3                         ok                3.51s 
+  OK group/auto-glm-5-3                     ok                3.66s 
+  OK group/auto-auto                        ok                7.38s 
+  !! zhipu/glm-5.3-flash                    rate-limit        8.75s Zhipu GLM: 您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。
+  !! zhipu/glm-5.3                          rate-limit        8.86s Zhipu GLM: 您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。
+  OK group/auto-grok-4-7-500k               ok                9.62s 
+  OK cursor/auto                            ok                4.54s 
+  OK group/auto-grok-4-5                    ok               11.94s 
+  OK group/auto-grok-4-6                    ok               13.15s 
+  OK cursor/grok-4.7@256k                   ok                7.53s 
+  OK cursor/claude-opus-5-5@300k            ok                4.92s 
+  OK cursor/claude-opus-5-5@1m              ok                4.09s 
+  OK cursor/grok-4.7@500k                   ok                9.53s 
+  OK cursor/claude-opus-5@300k              ok                 3.7s 
+  OK cursor/grok-4.6                        ok                11.0s 
+  OK cursor/composer-2.5                    ok                 8.7s 
+  OK cursor/claude-opus-5@1m                ok               10.25s 
+  OK cursor/claude-opus-4-8@1m              ok                8.73s 
+  OK cursor/claude-opus-4-8@300k            ok                9.89s 
+  OK cursor/gpt-5.6-sol@272k                ok                7.19s 
+  OK cursor/gpt-5.6-sol@1m                  ok                6.59s 
+  OK cursor/gpt-5.5@272k                    ok                7.02s 
+  OK codex/gpt-6-astra                      ok               27.28s 
+  OK cursor/gpt-5.5@1m                      ok                5.66s 
+  OK cursor/claude-fable-5@1m               ok                6.21s 
+  OK codex/gpt-6-luna                       ok               34.77s 
+  OK cursor/gemini-3.8-flash                ok                9.25s 
+  OK cursor/claude-fable-5-1@1m             ok               12.08s 
+  OK codex/gpt-6-sol                        ok                35.7s 
+  OK cursor/muse-spark-1.3@300k             ok                6.09s 
+  OK cursor/grok-4.5                        ok               12.24s 
+  OK cursor/claude-fable-5@300k             ok                12.9s 
+  OK cursor/gemini-3.7-flash                ok                 7.3s 
+  OK cursor/claude-fable-5-1@300k           ok               13.14s 
+  OK grok/grok-4.7                          ok                3.33s 
+  OK codex/gpt-6.1-sol                      ok                40.3s 
+  OK cursor/muse-spark-1.3@1m               ok                4.58s 
+  OK grok/grok-4.7@500k                     ok                5.22s 
+  OK grok/grok-4.6                          ok                6.14s 
+  OK grok/grok-4.5                          ok                6.48s 
+  OK grok/grok-4.5@500k                     ok                6.78s 
+  OK grok/grok-4.7-build-fast               ok                8.02s 
+  OK grok/grok-4.7-build-fast@500k          ok                7.91s 
+  !! workbuddy/deepseek-v4.1-flash          rate-limit        0.65s WorkBuddy: 您的使用量已超出频率限制，将在 2026-10-12 20:48:22 UTC+8 重置，您也可以切换其他模型继续使用。
+  OK workbuddy/hy3                          ok                1.74s 
+  OK workbuddy/hy4-preview-f                ok                4.87s 
+  OK grok/grok-4.6@500k                     ok                8.53s 
+  OK workbuddy/hy3-x                        ok                2.07s 
+  OK workbuddy/auto                         ok                4.25s 
+  OK workbuddy/glm-5.2                      ok                1.98s 
+  OK workbuddy/glm-5.3-flash                ok                2.42s 
+  OK workbuddy/glm-5.1                      ok                2.96s 
+  !! zcode/GLM-5.3-Flash                    rate-limit        8.92s ZCode: [1310][您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。][202610121530167eacd2
+  OK workbuddy/kimi-k2.7                    ok                2.17s 
+  OK workbuddy/glm-5.3                      ok                4.05s 
+  !! zcode/GLM-5.3                          rate-limit        8.77s ZCode: [1310][您已达到每周/每月使用上限，您的限额将在 2026-10-14 11:30:13 重置。][20261012153017a60708
+  OK workbuddy/deepseek-v4-pro              ok                1.92s 
+  OK workbuddy/minimax-m3                   ok                3.31s 
+  OK workbuddy/hy4-preview                  ok                2.59s 
+  OK workbuddy/kimi-k2.8-preview            ok                3.02s 
+  OK workbuddy/kimi-k3-1                    ok                5.65s 
+  OK workbuddy/space-bunny                  ok                4.54s 
+  OK workbuddy-ai/default-model             ok                4.75s 
+  OK workbuddy/kimi-k2.6                    ok                9.17s 
+  OK workbuddy-ai/hy3                       ok                7.36s 
+  OK workbuddy-ai/glm-5.3                   ok                12.2s 
+  OK qoder/qfmodel                          ok               22.27s 
+  OK opencode-zen-free/big-pickle           ok               18.62s 
+  OK qoder/dfmodel                          ok               19.38s 
+  OK qoder/dmodel                           ok               20.91s 
+  OK qoder/gfmodel                          ok               23.79s 
+  OK qoder/gmodel                           ok               25.36s 
+  OK opencode-zen-free/muse-spark-1.3-contributor-free ok               27.93s 
+  OK opencode-zen-free/mimo-v2.6-flash-free ok               33.07s 
+  !! workbuddy/glm-5v-turbo                 timeout           45.0s 
+  !! opencode-zen-free/ling-3.1-flash-free  timeout           45.0s 
+  OK opencode-zen-free/nemotron-3.5-lightning-free ok               34.21s 
+  OK opencode-zen-free/step-5-preview-free  ok               35.51s 
+  !! opencode-zen-free/longcat-2.5-preview-free timeout           45.0s 
+  !! opencode-zen-free/space-bunny-free     timeout           45.0s 
+  discovery: 83 models via /models
+
+72/83 ok -> /Users/douba/Projects/dsh-model-picker/tools/model-probe/results/liveness-20261012-153126.json
