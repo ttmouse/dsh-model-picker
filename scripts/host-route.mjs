@@ -313,12 +313,18 @@ if (strandedTest.status !== 200 || strandedTest.json.ok !== true) throw new Erro
     }
   }
   const reModels = await call(served.get('/api/model-picker/models'), get)
-  console.log('re-enable  : routes=%d status=%d ok=%s', served.size, reModels.status, JSON.stringify(reModels.json?.ok))
-  if (served.size !== 2) {
+  const reQuotas = await call(served.get('/api/model-picker/quotas'), get)
+  console.log('re-enable  : routes=%d status=%d ok=%s quotas=%s', served.size, reModels.status, JSON.stringify(reModels.json?.ok), JSON.stringify(reQuotas.json?.ok))
+  if (served.size !== 3) {
     throw new Error(`each route must be served once after re-enabling, got ${served.size}`)
   }
   if (reModels.status !== 200 || reModels.json.ok !== true) {
     throw new Error('the surviving route must keep answering after a re-enable')
+  }
+  // The quota route answers 200 with a list whether or not the magpie gateway
+  // is up: an unreachable gateway is empty quota rows, never an error body.
+  if (reQuotas.status !== 200 || reQuotas.json.ok !== true || !Array.isArray(reQuotas.json.quotas)) {
+    throw new Error('the quota route must fail open as an empty list')
   }
 
   // …and a real registration failure must stay loud. Swallowing everything
