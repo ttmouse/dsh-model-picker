@@ -2132,6 +2132,116 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   }
 }
 
+// 13k.4b. A queued row is a switching surface, like every other list in this
+//         panel: a press commits that row's model, the row of the model in use
+//         says so instead of offering to switch to where it already is, and a
+//         drag (the queue's other gesture on the same row) is not a press.
+//         jsdom has no pointer capture and no layout, so the press is driven
+//         through the pointer handlers the way a real drag begins, and the
+//         drag half is asserted at the door: the row names both gestures.
+{
+  const { host, root } = await failoverMount({ 'dsh.modelPicker.fallback': JSON.stringify(['zhipu/glm-4.6', '17an/qwen3-max']) })
+  await openFallbackPage(host)
+  const rows = [...host.querySelectorAll('.dsh-mp2-fallbackItem')]
+  console.log('queue rows    : n=%d roles=%s current=%s', rows.length,
+    JSON.stringify(rows.map((row) => row.getAttribute('role'))),
+    JSON.stringify(rows.map((row) => row.getAttribute('aria-checked'))))
+  if (rows.length !== 2) throw new Error(`the seeded queue must draw both routes, got ${rows.length}`)
+  if (rows.some((row) => row.getAttribute('role') !== 'button' || row.getAttribute('tabindex') !== '0')) {
+    throw new Error('every queued row must be a pressable control, so it can switch the model')
+  }
+  if (rows[0].getAttribute('title') === '' || !rows[0].getAttribute('title').includes('drag')) {
+    throw new Error(`a queued row must still name the drag that reorders it, got ${JSON.stringify(rows[0].getAttribute('title'))}`)
+  }
+
+  // Press the second row: the pointer goes down and comes back up without ever
+  // passing the drag threshold.
+  const before = selections.length
+  const pointer = (type, target, extra = {}) => {
+    const event = new dom.window.MouseEvent(type, { bubbles: true, cancelable: true, ...extra })
+    Object.defineProperties(event, {
+      isPrimary: { value: true }, pointerType: { value: 'mouse' }, button: { value: 0 },
+      pointerId: { value: 1 }, clientX: { value: 10 }, clientY: { value: 10 },
+    })
+    target.dispatchEvent(event)
+  }
+  await act(async () => { pointer('pointerdown', rows[1]) })
+  await act(async () => { pointer('pointerup', rows[1]) })
+  console.log('queue press   : picks=%d last=%s', selections.length - before, JSON.stringify(selections.at(-1)))
+  // The row the press landed on is the one that was committed, which is only a
+  // real assertion if the two rows are different models.
+  if (rows[0].querySelector('.dsh-mp2-modelName').textContent === rows[1].querySelector('.dsh-mp2-modelName').textContent) {
+    throw new Error('the seeded rows must name different models for the press to be attributable')
+  }
+  if (selections.length !== before + 1) throw new Error('pressing a queued row must submit that model')
+  if (selections.at(-1)?.provider !== '17an' || selections.at(-1)?.model !== 'qwen3-max') {
+    throw new Error(`the press must submit the row it landed on, got ${JSON.stringify(selections.at(-1))}`)
+  }
+  if (host.querySelector('.dsh-mp2-fallbackPage') !== null) throw new Error('a committed press must close the page')
+  if (JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback')).join(',') !== 'zhipu/glm-4.6,17an/qwen3-max') {
+    throw new Error('switching from the queue must not touch the queue itself')
+  }
+
+  // Reopen: the model that is now running is marked, not offered as a switch.
+  await openFallbackPage(host)
+  const after = [...host.querySelectorAll('.dsh-mp2-fallbackItem')]
+  const marks = after.map((row) => row.querySelector('.dsh-mp2-fallbackCurrent')?.textContent ?? null)
+  console.log('current mark  : marks=%s checked=%s', JSON.stringify(marks), JSON.stringify(after.map((row) => row.getAttribute('aria-checked'))))
+  if (marks[0] !== null || marks[1] !== 'In use now') {
+    throw new Error(`only the running model's row may wear the in-use mark, got ${JSON.stringify(marks)}`)
+  }
+  const again = selections.length
+  await act(async () => { pointer('pointerdown', after[1]) })
+  await act(async () => { pointer('pointerup', after[1]) })
+  if (selections.length !== again) throw new Error('pressing the row of the model already in use must not re-submit it')
+  if (host.querySelector('.dsh-mp2-fallbackPage') !== null) throw new Error('the press that lands on the current model still closes the page')
+
+  // A drag is not a press: the pointer travels past the threshold, and the
+  // release that ends it must not switch anything.
+  await openFallbackPage(host)
+  // Drag the row that is NOT in use: a press there would switch, so the case
+  // proves something only where a press would have had an effect.
+  const dragRows = [...host.querySelectorAll('.dsh-mp2-fallbackItem')].filter((row) => row.getAttribute('aria-checked') !== 'true')
+  if (dragRows.length === 0) throw new Error('the drag case needs a row that is not the running model')
+  const during = selections.length
+  // jsdom applies no CSS, so the row has no grab cursor: the state that
+  // decides "this was a press, not a drag" is set here the way a real pointer
+  // move sets it once it passes the 4px threshold — with a horizontal offset,
+  // because reordering itself needs layout jsdom does not have.
+  const dragRef = plugin.__testDragRef()
+  if (!dragRef || !('current' in dragRef)) throw new Error('the suite must be able to read the queue drag record')
+  await act(async () => { pointer('pointerdown', dragRows[0]) })
+  if (dragRef.current === null) throw new Error('a pointer down on a queued row must arm it as a drag candidate')
+  await act(async () => {
+    dragRef.current.dragging = true
+    pointer('pointermove', dragRows[0], { clientX: 40 })
+  })
+  if (dragRef.current?.dragging !== true) throw new Error('the drag case must be dragging when it releases')
+  await act(async () => { pointer('pointerup', dragRows[0], { clientX: 40 }) })
+  console.log('drag release  : picks=%d', selections.length - during)
+  if (selections.length !== during) throw new Error('releasing a drag on a queued row must not also switch the model')
+  await act(async () => { root.unmount() })
+}
+
+// 13k.4c. The running row is marked where it stands. The mark has to sit on the
+//         name's line and share its midline (container alignment, not a margin
+//         nudge), and it must not survive when the row is not the current one —
+//         the same rule the model list's tick follows.
+{
+  const styles = [...document.querySelectorAll('style[data-plugin="dsh-model-picker"]')].map((node) => node.textContent).join('\n')
+  const markAt = styles.indexOf('.dsh-mp2-fallbackCurrent{')
+  const markRule = markAt === -1 ? '' : styles.slice(markAt, styles.indexOf('}', markAt))
+  console.log('current mark  : rule=%s', JSON.stringify(markRule))
+  if (markAt === -1) throw new Error('the in-use mark needs its own rule')
+  if (!markRule.includes('align-items:center') || !markRule.includes('font-size:var(--dsh-mp2-font-xs)')) {
+    throw new Error('the in-use mark must centre itself in the name row and use the stamp scale')
+  }
+  if (/margin-(top|bottom)/.test(markRule)) {
+    throw new Error('the in-use mark must be aligned by the row, not nudged with a margin')
+  }
+  // Real geometry is measured in a browser (scripts/screenshot-queue-switch.mjs).
+}
+
 // 13k.5. What "check the list" covers. The scope follows the right column: a query
 //        means the models it found, and no query means one representative per
 //        provider instead of the whole catalog — on this machine a thousand routes
