@@ -36,6 +36,24 @@ await context.route((url) => url.href.includes('/plugins/??'), async (route) => 
 })
 const page = await context.newPage()
 
+// The test route is stubbed: the shot is about where the answer sits, not
+// about what a channel says, and a real probe would spend a request.
+await page.addInitScript(() => {
+  const realFetch = window.fetch.bind(window)
+  let seen = 0
+  window.fetch = (input, init) => {
+    const url = String(typeof input === 'string' ? input : input?.url ?? '')
+    if (!url.includes('/api/model-picker/test')) return realFetch(input, init)
+    seen += 1
+    const first = seen === 1
+    return new Promise((resolve) => setTimeout(() => resolve({
+      ok: true,
+      json: async () => (first ? { ok: true, ms: 1500 } : { ok: false, state: 'quota', error: 'insufficient balance' }),
+    }), 80))
+  }
+})
+
+
 // A queue with content, so the fallback page has rows to measure.
 await page.addInitScript(() => {
   window.localStorage.setItem('dsh.modelPicker.fallback', JSON.stringify(['deepseek-official/deepseek-flash','deepseek-account/deepseek-flash','opencode-go1/deepseek-v4-pro','commandcode/deepseek/deepseek-v4-pro','magpie/deepseek-v4.1-flash','17an/qwen3-max','magpie/glm-5.3-flash','zai-coding-cn/glm-5.3-flash','minimax-code/m3.1-flash-preview','clim/deepseek-v4.1-flash','lobsterai/deepseek-v4.1-flash','opencode-go1/deepseek-v4-flash']))
@@ -88,6 +106,18 @@ const MEASURE = () => {
     list: listR ? { x: Math.round(listR.x), y: Math.round(listR.y), w: Math.round(listR.width), h: Math.round(listR.height) } : null,
     rows: rowInfo,
     pitches,
+    detail: (() => {
+      const row = rows.find((el) => el.querySelector('.dsh-mp2-fallbackMark'))
+      if (!row) return null
+      const desc = row.querySelector('.dsh-mp2-description')
+      const mark = row.querySelector('.dsh-mp2-fallbackMark')
+      const name = row.querySelector('.dsh-mp2-modelName')
+      const r = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), mid: Math.round(b.y + b.height / 2) } }
+      return { name: r(name), desc: desc ? r(desc) : null, mark: r(mark),
+        markFollowsDesc: desc ? r(mark).x > r(desc).x : null,
+        sameLineAsDesc: desc ? Math.abs(r(mark).mid - r(desc).mid) <= 2 : null,
+        sameLineAsName: Math.abs(r(mark).mid - r(name).mid) <= 2 }
+    })(),
   }
 }
 
@@ -99,7 +129,11 @@ await page.screenshot({ path: 'live-panel-model.png' })
 
 await page.evaluate(() => document.querySelector('.dsh-mp2-footerFallback')?.click())
 await page.waitForSelector('.dsh-mp2-fallbackPage', { timeout: 8000 })
-await page.waitForTimeout(400)
+await page.waitForTimeout(300)
+// probeFirstRows: two rows get an answer so the detail line has a mark on it.
+const probeFirstRows = await page.$$('.dsh-mp2-fallbackItem .dsh-mp2-fallbackTest')
+for (const button of probeFirstRows.slice(0, 2)) await button.evaluate((node) => node.click())
+await page.waitForTimeout(600)
 const fallback = await page.evaluate(MEASURE)
 await page.screenshot({ path: 'live-panel-fallback.png' })
 
