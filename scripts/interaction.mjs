@@ -2308,6 +2308,79 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   }
 }
 
+// 13k.4c. Two orders, and the reader picks. Automatic ranks by the last answer
+//         (connected first, quickest first, untested/failed after); manual is
+//         the drag order untouched — that order IS the failover priority, so a
+//         probe must never rewrite it.
+{
+  const realFetch = globalThis.fetch
+  const delays = { 'zhipu/glm-4.6': 900, '17an/qwen3-max': 200 }
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).includes('/api/model-picker/test')) return realFetch(url, init)
+    const sent = JSON.parse(init.body)
+    const route = sent.provider + '/' + sent.model
+    const ms = delays[route]
+    // One route answers slowly, one fast, and the third does not answer at all.
+    if (ms === undefined) return { ok: true, json: async () => ({ ok: false, state: 'timeout', error: 'no answer' }) }
+    return { ok: true, json: async () => ({ ok: true, ms }) }
+  }
+  try {
+    const namesOf = (host) => [...host.querySelectorAll('.dsh-mp2-fallbackItem .dsh-mp2-modelName')].map((node) => node.textContent)
+    const sortButtonOf = (host) => host.querySelector('.dsh-mp2-fallbackSort')
+    const { host, root } = await failoverMount({
+      'dsh.modelPicker.fallback': JSON.stringify(['zhipu/glm-4.6', 'deepseek/deepseek-reasoner', '17an/qwen3-max']),
+    }, CLEAN)
+    await openFallbackPage(host)
+    const manualOrder = namesOf(host)
+    console.log('manual order  : %s', JSON.stringify(manualOrder))
+    if (sortButtonOf(host) === null) throw new Error('the queue must offer a sort switch')
+    if (!sortButtonOf(host).textContent.includes('Manual')) {
+      throw new Error(`the switch must name the mode in use, got ${JSON.stringify(sortButtonOf(host).textContent)}`)
+    }
+
+    // Probe every row, then flip to automatic.
+    for (const button of [...host.querySelectorAll('.dsh-mp2-fallbackItem .dsh-mp2-fallbackTest')]) {
+      await act(async () => { button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    }
+    await flushProbe()
+    await flushProbe()
+    await act(async () => { sortButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    const autoOrder = namesOf(host)
+    console.log('auto order    : %s (switch=%s)', JSON.stringify(autoOrder), JSON.stringify(sortButtonOf(host).textContent))
+    if (sortButtonOf(host).textContent.includes('Manual') === false && !sortButtonOf(host).textContent.includes('Auto')) {
+      throw new Error('the switch must name the automatic mode once it is on')
+    }
+    if (autoOrder.length !== 3) throw new Error(`automatic order must keep every row, got ${autoOrder.length}`)
+    if (autoOrder[0] !== 'Qwen3 Max' || autoOrder[1] !== 'GLM-4.6') {
+      throw new Error(`automatic order must put the quickest answer first, got ${JSON.stringify(autoOrder)}`)
+    }
+    // The route that never answered sorts after both that did, whatever its
+    // position in the manual order.
+    if (autoOrder[2] !== 'DeepSeek Reasoner') {
+      throw new Error(`an unanswered row must sort last, got ${JSON.stringify(autoOrder)}`)
+    }
+    if (dom.window.localStorage.getItem('dsh.modelPicker.fallbackSort') !== 'auto') {
+      throw new Error('the chosen order must be remembered')
+    }
+    // The stored priority is untouched by the automatic view.
+    const stored = JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback'))
+    console.log('stored order  : %s', JSON.stringify(stored))
+    if (JSON.stringify(stored) !== JSON.stringify(['zhipu/glm-4.6', 'deepseek/deepseek-reasoner', '17an/qwen3-max'])) {
+      throw new Error(`automatic order must not rewrite the drag order, got ${JSON.stringify(stored)}`)
+    }
+    // ...and switching back hands the reader exactly that order again.
+    await act(async () => { sortButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    const backTo = namesOf(host)
+    console.log('back to manual: %s', JSON.stringify(backTo))
+    if (JSON.stringify(backTo) !== JSON.stringify(manualOrder)) {
+      throw new Error(`switching back must restore the drag order, got ${JSON.stringify(backTo)}`)
+    }
+    await act(async () => { root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+}
+
 // 13k.5. What "check the list" covers. The scope follows the right column: a query
 //        means the models it found, and no query means one representative per
 //        provider instead of the whole catalog — on this machine a thousand routes
