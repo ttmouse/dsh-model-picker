@@ -842,8 +842,70 @@ if (!foldedModels.includes('DeepSeek Reasoner (modlens vision)')) throw new Erro
 
 const visionOption = [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-option')]
   .find(option => option.querySelector('.dsh-mp2-modelName')?.textContent === 'DeepSeek Reasoner (modlens vision)')
-if (visionOption === undefined) throw new Error('folded model row missing')
-await act(async () => { visionOption.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+// 7b. The box takes a phrase, not a word (`-19`). `flash 4.1` is two terms
+//     and the list must narrow to rows carrying BOTH — the bug being that the
+//     whole string was matched as one substring, so a two-word query returned
+//     nothing at all. The exact expected set is pinned below, so a rule that
+//     ORed the terms (which would keep `glm-5.3-flash`, a row that says only
+//     `flash`) fails here rather than passing a length check.
+await act(async () => { typeInto(search, 'flash 4.1') })
+const bothTerms = modelNames()
+console.log('--- phrase "flash 4.1" ---')
+console.log('models :', bothTerms)
+// The one fake row that carries both, in its name (`V4.1`) and its id (`4.1`).
+if (JSON.stringify(bothTerms) !== JSON.stringify(['DeepSeek-V4.1-Flash · Trae CN'])) {
+  throw new Error(`a phrase must keep exactly the rows carrying every term, got ${JSON.stringify(bothTerms)}`)
+}
+// Each term may be answered by a DIFFERENT field: `vision-exp` supplies the
+// first from the id while the display name still says Flash.
+await act(async () => { typeInto(search, 'flash vision-exp') })
+const splitFields = modelNames()
+console.log('models (split fields):', splitFields)
+if (JSON.stringify(splitFields) !== JSON.stringify(['DeepSeek V4 Flash Vision'])) {
+  throw new Error(`a term may be answered by the id while another is answered by the name, got ${JSON.stringify(splitFields)}`)
+}
+// …and one may be answered by the description, which no row repeats in its
+// label: `flagship` is Qwen3 Max's description and nothing else's.
+await act(async () => { typeInto(search, 'qwen flagship') })
+const byDescription = modelNames()
+console.log('models (description):', byDescription)
+if (JSON.stringify(byDescription) !== JSON.stringify(['Qwen3 Max'])) {
+  throw new Error(`a term must be found in the description too, got ${JSON.stringify(byDescription)}`)
+}
+// A term nothing carries empties the list — the AND has to be able to fail,
+// or a rule that silently dropped unknown terms would look correct above.
+await act(async () => { typeInto(search, 'flash zzzz') })
+console.log('models (impossible):', modelNames())
+if (modelNames().length !== 0) throw new Error('a term nothing carries must empty the list')
+// Padding and repeated spaces are the same query: the split is on whitespace,
+// not on a single space, so a pasted phrase with a stray gap still works.
+await act(async () => { typeInto(search, '  flash   4.1  ') })
+if (JSON.stringify(modelNames()) !== JSON.stringify(bothTerms)) {
+  throw new Error('surrounding and repeated spaces must not change the query')
+}
+// Order does not matter: the same two terms typed the other way round name the
+// same rows, because both are conjuncts without a position.
+await act(async () => { typeInto(search, '4.1 flash') })
+if (JSON.stringify(modelNames()) !== JSON.stringify(bothTerms)) {
+  throw new Error(`the term order must not change the result: ${JSON.stringify(modelNames())}`)
+}
+// One term is still the old substring test: nothing about the single-word
+// behaviour was meant to change, and `flash` still reaches three rows.
+await act(async () => { typeInto(search, 'flash') })
+const singleTerm = modelNames()
+console.log('models (single):', singleTerm)
+if (JSON.stringify(singleTerm) !== JSON.stringify(['glm-5.3-flash', 'DeepSeek V4 Flash Vision', 'DeepSeek-V4.1-Flash · Trae CN'])) {
+  throw new Error(`a single term must keep matching as a substring, got ${JSON.stringify(singleTerm)}`)
+}
+
+// The vision row was captured before these queries ran, so it has to be looked
+// up again once the box is cleared: the phrase left the list showing three
+// rows, and a stale node is no longer in the document to receive the click.
+await act(async () => { typeInto(search, '') })
+const visionRow = [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-option')]
+  .find(option => option.querySelector('.dsh-mp2-modelName')?.textContent === 'DeepSeek Reasoner (modlens vision)')
+if (visionRow === undefined) throw new Error('folded model row missing')
+await act(async () => { visionRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
 const submitted = selections.at(-1)
 console.log('submitted  :', JSON.stringify(submitted))
 if (submitted?.provider !== 'deepseek-vision') {
@@ -2746,6 +2808,49 @@ const rowOfModel = (host, name) =>
   console.log('stale stamp   : marked=%s', JSON.stringify(marked))
   if (marked.length !== 1 || marked[0] !== 'Qwen3 Max') {
     throw new Error(`only an unexpired stamp may show, got ${JSON.stringify(marked)}`)
+  }
+  await act(async () => { root.unmount() })
+}
+
+// 13v. The fallback page's own search box takes the same phrase (`-19`). It is
+//      a separate box with a separate matcher, so the popup tests above say
+//      nothing about it: the same two-term query has to narrow its candidate
+//      list the same way, or the two search boxes would answer differently.
+{
+  const { host, root } = await failoverMount({}, CLEAN)
+  await openFallbackPage(host)
+  const candidateNames = () => [...host.querySelectorAll('.dsh-mp2-fallbackCandidates .dsh-mp2-modelName')]
+    .map((node) => node.textContent)
+  await typeFallbackSearch(host, 'flash')
+  const single = candidateNames()
+  console.log('fallback single: n=%d %s', single.length, JSON.stringify(single))
+  // Three rows carry `flash`; the sets below are pinned so the narrowing is
+  // measured against a real superset rather than against itself.
+  if (JSON.stringify(single) !== JSON.stringify(['glm-5.3-flash', 'DeepSeek V4 Flash Vision', 'DeepSeek-V4.1-Flash · Trae CN'])) {
+    throw new Error(`the fallback box must find every row carrying one term, got ${JSON.stringify(single)}`)
+  }
+  await typeFallbackSearch(host, 'flash 4.1')
+  const phrase = candidateNames()
+  console.log('fallback phrase: n=%d %s', phrase.length, JSON.stringify(phrase))
+  // The point of the phrase is that it is narrower, never empty: before the
+  // rule changed this box returned nothing at all for two terms.
+  if (JSON.stringify(phrase) !== JSON.stringify(['DeepSeek-V4.1-Flash · Trae CN'])) {
+    throw new Error(`the fallback phrase must keep exactly the rows carrying both terms, got ${JSON.stringify(phrase)}`)
+  }
+  // The page still knows it is searching: the queue is replaced by candidates
+  // and the empty-state copy is not drawn.
+  if (host.querySelector('.dsh-mp2-fallbackCandidates') === null) {
+    throw new Error('the phrase must keep the candidate list on screen')
+  }
+  await typeFallbackSearch(host, 'flash zzzz')
+  const impossible = candidateNames()
+  console.log('fallback miss  : n=%d empty=%s', impossible.length, host.querySelector('.dsh-mp2-empty') !== null)
+  if (impossible.length !== 0) throw new Error(`a term nothing carries must empty the candidates, got ${JSON.stringify(impossible)}`)
+  if (host.querySelector('.dsh-mp2-empty') === null) throw new Error('an empty result must say so')
+  // Clearing the box brings the queue back, so the phrase did not tear the page.
+  await typeFallbackSearch(host, '')
+  if (host.querySelector('.dsh-mp2-fallbackList') === null) {
+    throw new Error('clearing the phrase must restore the queue')
   }
   await act(async () => { root.unmount() })
 }
