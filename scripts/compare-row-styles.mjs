@@ -23,14 +23,13 @@ const context = await browser.newContext({ viewport: { width: 1000, height: 1100
 await context.setExtraHTTPHeaders({ cookie })
 
 const NEW_CLIENT = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+import { pickerSegment, withCheckoutPicker } from './bundle-swap.mjs'
 await context.route((url) => url.href.includes('/plugins/??'), async (route) => {
   const response = await route.fetch()
   const html = await response.text()
-  if (!html.includes("load({ id: 'dsh-model-picker'") || html.includes('--dsh-mp2-font-xs')) return route.fulfill({ response })
-  const MARK = "window.__ModuleLoader__.load({ id: '"
-  const start = html.indexOf(MARK + "dsh-model-picker'")
-  const next = html.indexOf(MARK, start + MARK.length)
-  return route.fulfill({ response, body: html.slice(0, start) + NEW_CLIENT + (next === -1 ? '' : html.slice(next)) })
+  const served = pickerSegment(html)
+  if (served === null) return route.fulfill({ response })
+  return route.fulfill({ response, body: withCheckoutPicker(html, NEW_CLIENT) })
 })
 
 const page = await context.newPage()

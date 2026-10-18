@@ -46,16 +46,13 @@ await context.setExtraHTTPHeaders({ cookie: sessionCookie() })
 // needs this to be what a live page runs (see screenshot-fallback-probe.mjs).
 import { readFileSync as _rf } from 'node:fs'
 const NEW_CLIENT = _rf(new URL('../lib/client.js', import.meta.url), 'utf8')
+import { pickerSegment, withCheckoutPicker } from './bundle-swap.mjs'
 await context.route((url) => url.href.includes('/plugins/??'), async (route) => {
   const response = await route.fetch()
   const body = await response.text()
-  if (!body.includes("load({ id: 'dsh-model-picker'") || body.includes('--dsh-mp2-font-xs')) {
-    return route.fulfill({ response })
-  }
-  const MARK = "window.__ModuleLoader__.load({ id: '"
-  const start = body.indexOf(MARK + "dsh-model-picker'")
-  const next = body.indexOf(MARK, start + MARK.length)
-  return route.fulfill({ response, body: body.slice(0, start) + NEW_CLIENT + (next === -1 ? '' : body.slice(next)) })
+  const served = pickerSegment(body)
+  if (served === null) return route.fulfill({ response })
+  return route.fulfill({ response, body: withCheckoutPicker(body, NEW_CLIENT) })
 })
 
 const page = await context.newPage()
