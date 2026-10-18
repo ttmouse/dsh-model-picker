@@ -223,32 +223,6 @@ const fakeSession = {
     sessionListeners.add(listener)
     return () => { sessionListeners.delete(listener) }
   },
-  // The REAL contract: `Session.eventSource` is a MutableSessionEventSource
-  // whose snapshot is `{ entries, hasMore, revision, change }`, and every entry
-  // is a `{ type: 'event', event }` wrapper. `events` is the private transport
-  // journal and has no getSnapshot at all — a fake that offered `events` with
-  // one hid exactly that mistake, so this fake offers only what the host does.
-  eventSource: {
-    getSnapshot: () => ({
-      entries: [
-        ...(repairState.originalText === null ? [] : [{
-          type: 'event',
-          event: {
-            type: 'user/message',
-            data: { message: { role: 'user', content: [{ type: 'text', text: repairState.originalText }] } },
-          },
-        }]),
-        ...repairLog.map((event) => ({ type: 'event', event })),
-        ...(repairState.interrupted === undefined ? [] : [{
-          type: 'event',
-          event: { type: 'assistant/message', data: { interrupted: repairState.interrupted } },
-        }]),
-      ],
-      hasMore: false,
-      revision: 0,
-      change: { kind: 'replace', entries: [] },
-    }),
-  },
   prompt: (content, mode) => {
     repairCalls.prompts.push({ content, mode })
     return Promise.resolve(repairState.promptResult)
@@ -256,12 +230,43 @@ const fakeSession = {
 }
 /** The session object this mount's port will follow (see `failoverMount`). */
 let currentSession = () => fakeSession
+
+// The REAL contract: the event window lives on the RETENTION BINDING, not on
+// the session face. `binding.eventSource` is a MutableSessionEventSource whose
+// snapshot is `{ entries, hasMore, revision, change }`, and every entry is a
+// `{ type: 'event', event }` wrapper. `binding.session` is a SessionFace — its
+// own docs say "the outward session face only" — and answers no log read at
+// all. A fake that hung the window off the session (or that offered `events`
+// with a getSnapshot) is what hid that mistake, so this fake offers exactly
+// what the host does and nothing more.
+const fakeWindow = {
+  getSnapshot: () => ({
+    entries: [
+      ...(repairState.originalText === null ? [] : [{
+        type: 'event',
+        event: {
+          type: 'user/message',
+          data: { message: { role: 'user', content: [{ type: 'text', text: repairState.originalText }] } },
+        },
+      }]),
+      ...repairLog.map((event) => ({ type: 'event', event })),
+      ...(repairState.interrupted === undefined ? [] : [{
+        type: 'event',
+        event: { type: 'assistant/message', data: { interrupted: repairState.interrupted } },
+      }]),
+    ],
+    hasMore: false,
+    revision: 0,
+    change: { kind: 'replace', entries: [] },
+  }),
+  subscribe: () => () => {},
+}
 sessions.retain = (_sessionId, _options) => {
   if (!repairState.reachable) throw new Error('unknown session')
   repairCalls.retained += 1
   return {
     ready: Promise.resolve(),
-    binding: { session: currentSession() },
+    binding: { session: currentSession(), eventSource: fakeWindow },
     release: () => {
       repairCalls.released += 1
       sessionListeners.clear()
@@ -1571,13 +1576,16 @@ for (const [label, storage, stage] of [
 //       while a fake that offered `events.getSnapshot` made the suite pass.
 //       The fake now models the host exactly; this guard keeps it that way.
 {
-  if (fakeSession.events !== undefined) {
-    throw new Error('the fake session must not offer `events`; the host exposes the window as `eventSource`')
+  // The window must hang off the retention BINDING (as `SessionBinding` says),
+  // and the session face must not pretend to carry one: reading the face was
+  // the bug, so a fake that answers there would hide it again.
+  if (fakeSession.events !== undefined || fakeSession.eventSource !== undefined) {
+    throw new Error('the fake session face must not carry a log; the host exposes the window on the binding')
   }
-  if (typeof fakeSession.eventSource?.getSnapshot !== 'function') {
-    throw new Error('the fake session must expose the real `eventSource.getSnapshot()` window')
+  if (typeof fakeWindow.getSnapshot !== 'function') {
+    throw new Error('the fake binding must expose the real `eventSource.getSnapshot()` window')
   }
-  const windowShape = fakeSession.eventSource.getSnapshot()
+  const windowShape = fakeWindow.getSnapshot()
   if (!Array.isArray(windowShape.entries) || windowShape.entries.length === 0) {
     throw new Error('the fake event window must answer `entries`, as MutableSessionEventSource does')
   }
