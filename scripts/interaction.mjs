@@ -2056,6 +2056,28 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   }
 }
 
+// 13k.3b. The queue holds the model list's row rhythm: a row keeps its own
+//         height even when the list is long. The model list is a block
+//         container, this one is a flex column, and a flex item shrinks by
+//         default — which squeezed every row to its 38px min-height once a
+//         dozen routes were on the list. jsdom has no layout engine, so the
+//         declarations are pinned here and the real geometry is measured
+//         against the live app (scripts/compare-panels.mjs).
+{
+  const styles = [...dom.window.document.querySelectorAll('style[data-plugin="dsh-model-picker"]')].map((node) => node.textContent).join('\n')
+  const rowAt = styles.indexOf('.dsh-mp2-fallbackItem{')
+  const rowRule = styles.slice(rowAt, styles.indexOf('}', rowAt))
+  const listAt = styles.indexOf('.dsh-mp2-fallbackList,')
+  const listRule = styles.slice(listAt, styles.indexOf('}', listAt))
+  console.log('fallback css  : row=%s | list=%s', JSON.stringify(rowRule.slice(0, 70)), JSON.stringify(listRule.slice(0, 100)))
+  if (rowAt === -1 || !rowRule.includes('flex:0 0 auto')) {
+    throw new Error('a queued row must not shrink: the flex column would squeeze it below its content height')
+  }
+  if (listAt === -1 || !listRule.includes('gap:var(--dsh-mp2-gap-2xs)') || !listRule.includes('padding:0 2px 2px 4px')) {
+    throw new Error("the queue must reuse the model list's own row rhythm")
+  }
+}
+
 // 13k.4. The fallback page's own batch button: one press walks every route on
 //        the list, each row wears the same answer a single press would leave,
 //        the ledger only keeps what failed, and the receipt counts the run.
