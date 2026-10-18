@@ -50,7 +50,7 @@ await context.setExtraHTTPHeaders({ cookie: sessionCookie() })
 await context.route((url) => url.href.includes('/plugins/??'), async (route) => {
   const response = await route.fetch()
   const body = await response.text()
-  if (!body.includes("load({ id: 'dsh-model-picker'") || body.includes('dsh-mp2-fallbackMark')) {
+  if (!body.includes("load({ id: 'dsh-model-picker'") || body.includes('--dsh-mp2-font-xs')) {
     return route.fulfill({ response })
   }
   const MARK = "window.__ModuleLoader__.load({ id: '"
