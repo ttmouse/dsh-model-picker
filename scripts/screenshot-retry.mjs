@@ -209,6 +209,9 @@ for (const [file, mode] of MOUNTS) {
     await page.evaluate(() => { window.__PARK__(); window.__ARM__(); })
     await page.waitForFunction(() => window.__READY__ === true)
     console.log('  press :', await page.evaluate(() => window.__PRESS__()))
+    // The press's own state has now been rendered while the scheduler is
+    // parked, so the frame is the disarmed state, not whichever frame the
+    // admission happened to leave behind.
   }
   const shot = await page.evaluate(() => window.__SHOT__ ?? null)
   const rect = await page.evaluate(() => {
