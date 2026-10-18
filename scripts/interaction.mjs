@@ -2242,6 +2242,72 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   // Real geometry is measured in a browser (scripts/screenshot-queue-switch.mjs).
 }
 
+// 13k.4b. A probe answer outlives the popup, both outcomes included. The
+//         failure ledger was the only memory before, so a pass vanished on
+//         close and the row reopened as never-tested — the one answer worth
+//         keeping ("this channel answered at 03:12") was the shortest-lived.
+{
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).includes('/api/model-picker/test')) return realFetch(url, init)
+    const sent = JSON.parse(init.body)
+    if (sent.provider === 'zhipu') return { ok: true, json: async () => ({ ok: true, ms: 1500 }) }
+    return { ok: true, json: async () => ({ ok: false, state: 'quota', error: 'insufficient balance' }) }
+  }
+  try {
+    const probesOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.probes') ?? 'null')
+    const { host, root } = await failoverMount({}, CLEAN)
+    await openFallbackPage(host)
+    await addFallbackCandidate(host, 'GLM-4.6')
+    await addFallbackCandidate(host, 'Qwen3 Max')
+    const buttons = [...host.querySelectorAll('.dsh-mp2-fallbackItem .dsh-mp2-fallbackTest')]
+    for (const button of buttons) await act(async () => { button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    await flushProbe()
+    const saved = probesOf()
+    console.log('probe record  : %s', JSON.stringify(saved))
+    if (saved?.['zhipu/glm-4.6']?.state !== 'ok') throw new Error('a pass must be recorded, not only a failure')
+    if (saved?.['zhipu/glm-4.6']?.ms !== 1500) throw new Error('the pass must keep its round trip')
+    if (saved?.['17an/qwen3-max']?.state !== 'quota') throw new Error('a failure must be recorded with its class')
+    if (!Number.isFinite(saved?.['zhipu/glm-4.6']?.at)) throw new Error('every answer must carry the time it was given')
+    await act(async () => { root.unmount() })
+
+    // Reopened from storage alone: both rows still say what was found, and the
+    // pass still shows its time — a bare ✓ would read as "checked just now".
+    // failoverMount clears storage per mount, so the record rides in as the
+    // seed — exactly how a real second page finds it on disk.
+    const second = await failoverMount({
+      'dsh.modelPicker.fallback': JSON.stringify(['zhipu/glm-4.6', '17an/qwen3-max']),
+      'dsh.modelPicker.probes': JSON.stringify(saved),
+    }, CLEAN)
+    await openFallbackPage(second.host)
+    const marks = [...second.host.querySelectorAll('.dsh-mp2-fallbackItem .dsh-mp2-fallbackMark')].map((node) => node.textContent)
+    console.log('after remount : %s', JSON.stringify(marks))
+    if (marks.length !== 2) throw new Error(`both answers must survive the remount, got ${marks.length}`)
+    if (!marks[0].includes('OK') || !/\d{2}:\d{2}/.test(marks[0])) {
+      throw new Error(`a remembered pass must keep its time, got ${JSON.stringify(marks[0])}`)
+    }
+    if (!marks[1].includes('Out of quota')) {
+      throw new Error(`a remembered failure must keep its class, got ${JSON.stringify(marks[1])}`)
+    }
+
+    // A newer answer replaces the older one for that route — the only thing
+    // that overwrites the record.
+    globalThis.fetch = async (url, init) => {
+      if (!String(url).includes('/api/model-picker/test')) return realFetch(url, init)
+      return { ok: true, json: async () => ({ ok: false, state: 'auth', error: 'invalid api key' }) }
+    }
+    await act(async () => { probeButtonOf(second.host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    const again = probesOf()
+    console.log('overwritten   : %s', JSON.stringify(again?.['zhipu/glm-4.6']))
+    if (again?.['zhipu/glm-4.6']?.state !== 'auth') throw new Error('a new answer must replace the older one')
+    await act(async () => { second.root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+}
+
 // 13k.5. What "check the list" covers. The scope follows the right column: a query
 //        means the models it found, and no query means one representative per
 //        provider instead of the whole catalog — on this machine a thousand routes
