@@ -223,19 +223,30 @@ const fakeSession = {
     sessionListeners.add(listener)
     return () => { sessionListeners.delete(listener) }
   },
-  events: {
+  // The REAL contract: `Session.eventSource` is a MutableSessionEventSource
+  // whose snapshot is `{ entries, hasMore, revision, change }`, and every entry
+  // is a `{ type: 'event', event }` wrapper. `events` is the private transport
+  // journal and has no getSnapshot at all — a fake that offered `events` with
+  // one hid exactly that mistake, so this fake offers only what the host does.
+  eventSource: {
     getSnapshot: () => ({
-      events: [
+      entries: [
         ...(repairState.originalText === null ? [] : [{
-          type: 'user/message',
-          data: { message: { role: 'user', content: [{ type: 'text', text: repairState.originalText }] } },
+          type: 'event',
+          event: {
+            type: 'user/message',
+            data: { message: { role: 'user', content: [{ type: 'text', text: repairState.originalText }] } },
+          },
         }]),
-        ...repairLog,
+        ...repairLog.map((event) => ({ type: 'event', event })),
         ...(repairState.interrupted === undefined ? [] : [{
-          type: 'assistant/message',
-          data: { interrupted: repairState.interrupted },
+          type: 'event',
+          event: { type: 'assistant/message', data: { interrupted: repairState.interrupted } },
         }]),
       ],
+      hasMore: false,
+      revision: 0,
+      change: { kind: 'replace', entries: [] },
     }),
   },
   prompt: (content, mode) => {
@@ -1026,6 +1037,70 @@ await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatch
 console.log('query after Esc  :', JSON.stringify(searchNow().value))
 if (searchNow().value !== '') throw new Error('Escape left the query behind')
 
+// 9e. An IME composition owns the keyboard until its candidate is committed.
+//     Pressing Enter to commit `flash` must not pick a model and must not close
+//     the panel (the reported `-18` bug); the ↑/↓ that walk the candidate list
+//     belong to the IME too, and so does the Escape that dismisses it.
+console.log('--- IME composition ---')
+const imeKey = async (k, extra) => {
+  await act(async () => {
+    searchNow().dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: k, bubbles: true, isComposing: true, ...extra }))
+  })
+}
+const composing = (kind) => act(async () => {
+  searchNow().dispatchEvent(new dom.window.CompositionEvent(kind, { bubbles: true, data: 'flash' }))
+})
+const popupOpen = () => container.querySelector('.dsh-mp2-menu') !== null
+const beforeIme = selections.length
+const imeCursor = activeName()
+await composing('compositionstart')
+await imeKey('ArrowDown')
+if (activeName() !== imeCursor) throw new Error('ArrowDown during an IME composition moved the panel cursor')
+await imeKey('Enter')
+if (selections.length !== beforeIme) throw new Error('Enter during an IME composition picked a model')
+if (!popupOpen()) throw new Error('Enter during an IME composition closed the popup')
+console.log('commit Enter     : popup open, picks:', selections.length - beforeIme)
+await composing('compositionend')
+// Safari delivers the confirming keydown after compositionend with no
+// isComposing flag on it, so the panel has to remember the composition ended.
+await act(async () => {
+  searchNow().dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+})
+if (selections.length !== beforeIme || !popupOpen()) {
+  throw new Error('the keydown that commits a composition picked a model')
+}
+// The legacy 229 marker is the same "the IME consumed this key" signal.
+await act(async () => {
+  searchNow().dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, keyCode: 229 }))
+})
+if (selections.length !== beforeIme || !popupOpen()) {
+  throw new Error('the keyCode 229 Enter that commits a composition picked a model')
+}
+// Once the composition has settled, a deliberate Enter still reaches the panel:
+// the cursor stands on the route already in use, so committing it just closes.
+// Any state change here would leak into the history checks below.
+await new Promise((resolve) => setTimeout(resolve, 140))
+await press('Enter')
+if (popupOpen()) throw new Error('a deliberate Enter stopped closing the popup after a composition')
+if (selections.length !== beforeIme) throw new Error('the IME test changed the selected route')
+console.log('Enter after IME  : popup closed:', !popupOpen(), '| picks:', selections.length - beforeIme)
+
+// Escape inside a composition cancels the candidate list, not the panel.
+await act(async () => { container.querySelector('.dsh-mp2-triggerLeft').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+await act(async () => { typeInto(searchNow(), 'fla') })
+await composing('compositionstart')
+await act(async () => {
+  document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, isComposing: true }))
+})
+if (!popupOpen()) throw new Error('Escape during an IME composition closed the popup')
+console.log('Escape in IME    : popup open:', popupOpen(), '| query:', JSON.stringify(searchNow().value))
+await composing('compositionend')
+await new Promise((resolve) => setTimeout(resolve, 140))
+await act(async () => {
+  document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+})
+if (popupOpen()) throw new Error('Escape stopped closing the popup after a composition')
+
 // 10. The history is a fixed-length shortcut, not an archive. Seeding more
 //     routes than the cap and remounting must trim it back to the cap, keep the
 //     route in use at the front, and leave a route that is no longer configured
@@ -1490,6 +1565,26 @@ for (const [label, storage, stage] of [
 //       conversation the user switches into and asks "where is the retry", so
 //       the row must be there on arrival, with no healthy-to-failed edge to
 //       wait for. Mounted straight onto a failed session, as a cold open is.
+//
+//       The contract itself is asserted first, because the first cut of this
+//       feature read `session.events` — which the real host does not answer —
+//       while a fake that offered `events.getSnapshot` made the suite pass.
+//       The fake now models the host exactly; this guard keeps it that way.
+{
+  if (fakeSession.events !== undefined) {
+    throw new Error('the fake session must not offer `events`; the host exposes the window as `eventSource`')
+  }
+  if (typeof fakeSession.eventSource?.getSnapshot !== 'function') {
+    throw new Error('the fake session must expose the real `eventSource.getSnapshot()` window')
+  }
+  const windowShape = fakeSession.eventSource.getSnapshot()
+  if (!Array.isArray(windowShape.entries) || windowShape.entries.length === 0) {
+    throw new Error('the fake event window must answer `entries`, as MutableSessionEventSource does')
+  }
+  if (windowShape.entries[0]?.type !== 'event' || windowShape.entries[0]?.event === undefined) {
+    throw new Error('every fake entry must be a `{ type: "event", event }` wrapper, as the host publishes')
+  }
+}
 {
   const { host, root } = await failoverMount({}, CLEAN)
   await act(async () => {
