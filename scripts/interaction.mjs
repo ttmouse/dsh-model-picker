@@ -211,6 +211,8 @@ const repairState = {
   promptResult: { ok: true, value: { accepted: true } },
 }
 const repairCalls = { retained: 0, released: 0, prompts: [], subscribed: 0 }
+/** The folded log the fake serves: `turn/end` reasons live here, as in the Host. */
+const repairLog = []
 const sessionListeners = new Set()
 /** Notify the seat the way the real Session's notifier does after a state change. */
 const sessionNotify = () => { for (const fn of [...sessionListeners]) fn() }
@@ -228,6 +230,7 @@ const fakeSession = {
           type: 'user/message',
           data: { message: { role: 'user', content: [{ type: 'text', text: repairState.originalText }] } },
         }]),
+        ...repairLog,
         ...(repairState.interrupted === undefined ? [] : [{
           type: 'assistant/message',
           data: { interrupted: repairState.interrupted },
@@ -240,12 +243,14 @@ const fakeSession = {
     return Promise.resolve(repairState.promptResult)
   },
 }
+/** The session object this mount's port will follow (see `failoverMount`). */
+let currentSession = () => fakeSession
 sessions.retain = (_sessionId, _options) => {
   if (!repairState.reachable) throw new Error('unknown session')
   repairCalls.retained += 1
   return {
     ready: Promise.resolve(),
-    binding: { session: fakeSession },
+    binding: { session: currentSession() },
     release: () => {
       repairCalls.released += 1
       sessionListeners.clear()
@@ -1356,6 +1361,7 @@ async function failoverMount(storage, stage) {
   dom.window.localStorage.clear()
   for (const [key, value] of Object.entries(storage)) dom.window.localStorage.setItem(key, value)
   sessionListeners.clear()
+  repairLog.length = 0
   repairCalls.prompts.length = 0
   repairCalls.retained = 0
   repairCalls.released = 0
@@ -1364,6 +1370,9 @@ async function failoverMount(storage, stage) {
   snapshot.current = { provider: 'deepseek', model: 'deepseek-reasoner', reasoningEffort: 'high' }
   repairState.reachable = true
   repairState.promptResult = { ok: true, value: { accepted: true } }
+  // Each mount gets its own session objects, so a port from an unmounted seat
+  // cannot answer for this one's store.
+  currentSession = () => ({ ...fakeSession, getSnapshot: () => repairState.snapshot })
   if (stage !== undefined) {
     repairState.snapshot = stage.snapshot
     repairState.interrupted = stage.interrupted
@@ -1384,9 +1393,6 @@ async function failoverMount(storage, stage) {
   })
   // Let the port's deferred first read settle (it awaits `reference.ready`).
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
-  if (process.env.DBG) {
-    console.log('   DBG: retained=%d released=%d listeners=%d', repairCalls.retained, repairCalls.released, sessionListeners.size)
-  }
   return { host, root }
 }
 
@@ -1405,7 +1411,10 @@ const CLEAN = {
   interrupted: undefined,
   originalText: null,
 }
-const buttonOf = (host) => host.querySelector('.dsh-mp2-failoverBtn')
+const buttonOf = (host) => host.querySelector('.dsh-mp2-failoverBtn:not([data-kind="retry"])')
+/** The same-model retry wears the strip's button shape too, so it is told apart
+ *  by its words: the failover button always names the model it will switch to. */
+const retryButtonOf = (host) => host.querySelector('.dsh-mp2-failoverBtn[data-kind="retry"]')
 /** The send-failure button label, captured in 13c and compared in 13d. */
 let sendLabel = null
 
@@ -1421,12 +1430,136 @@ for (const [label, storage, stage] of [
   await act(async () => { root.unmount() })
 }
 
-// 13b. A failure with NO fallback designated also shows nothing — "not set" means
-//      no button, never a button that cannot act.
+// 13b. A failure with NO fallback designated swaps the control rather than
+//      dropping it: with no fallback there is nothing to switch to, and
+//      retrying on the model already in use is the only repair left. It is a
+//      different button (different class, different words), never the failover
+//      one — that one cannot act without a route.
 {
-  const { host, root } = await failoverMount({}, SEND_FAILURE)
-  console.log('absent        : failure + no fallback → %s', buttonOf(host) === null ? 'no button' : 'BUTTON PRESENT')
-  if (buttonOf(host) !== null) throw new Error('a failure with no fallback must not render the button')
+  // The session is mounted healthy and breaks afterwards: the same order the
+  // real Host produces (the seat is watching, then the turn fails).
+  const { host, root } = await failoverMount({}, CLEAN)
+  await act(async () => {
+    repairState.snapshot = SEND_FAILURE.snapshot
+    repairState.originalText = SEND_FAILURE.originalText
+    sessionNotify()
+  })
+  const failover = buttonOf(host)
+  const retry = retryButtonOf(host)
+  console.log('absent        : failure + no fallback → failover=%s retry=%s', failover === null ? 'none' : 'PRESENT', retry === null ? 'none' : 'PRESENT')
+
+  if (failover !== null && failover.dataset.kind !== 'retry') {
+    throw new Error('a failure with no fallback must not render the failover button')
+  }
+  if (retry === null) throw new Error('a failure with no fallback must still offer the same-model retry')
+  // The retry names what it does, not what it will switch to: there is nothing
+  // to switch to.
+  if (!/Retry/.test(retry.textContent)) throw new Error(`the retry must name itself, got ${JSON.stringify(retry.textContent)}`)
+  const before = repairCalls.prompts.length
+  const picksBefore = selections.length
+  await act(async () => { retry.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  const sent = repairCalls.prompts.slice(before)
+  console.log('retry click   : prompts=%d mode=%s text=%s', sent.length, sent[0]?.mode, JSON.stringify(sent[0]?.content?.[0]?.text))
+  if (sent.length !== 1) throw new Error(`the retry must send exactly one prompt, got ${sent.length}`)
+  if (sent[0].mode !== 'queue') throw new Error(`the retry must queue, got ${sent[0].mode}`)
+  // A send failure never reached the Host, so the words go back out unchanged…
+  // and the model is NOT switched: this repair changes nothing the user chose.
+  if (sent[0].content[0].text !== SEND_FAILURE.originalText) {
+    throw new Error(`a send retry must replay the original words, got ${JSON.stringify(sent[0].content[0].text)}`)
+  }
+  if (selections.length !== picksBefore) {
+    throw new Error(`a same-model retry must not switch the model, got ${JSON.stringify(selections.slice(picksBefore))}`)
+  }
+  // …and a second press during that same failure must not queue it twice.
+  await act(async () => {
+    const again = retryButtonOf(host)
+    if (again !== null && again.disabled !== true) again.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  console.log('retry twice   : prompts=%d (button disarmed while the press is in flight)', repairCalls.prompts.length - before)
+  if (repairCalls.prompts.length !== before + 1) {
+    throw new Error(`a second press must not queue the same turn again, got ${repairCalls.prompts.length - before}`)
+  }
+  await act(async () => { root.unmount() })
+}
+
+// 13b.1. The reopened conversation. The failure is not in the snapshot at all —
+//       a turn that died inside its own `turn/end` reason is durable history,
+//       and the host draws「本轮运行失败」straight from it. That is exactly the
+//       conversation the user switches into and asks "where is the retry", so
+//       the row must be there on arrival, with no healthy-to-failed edge to
+//       wait for. Mounted straight onto a failed session, as a cold open is.
+{
+  const { host, root } = await failoverMount({}, CLEAN)
+  await act(async () => {
+    repairLog.push({
+      type: 'turn/end',
+      data: { turn: 3, reason: { kind: 'error', error: { message: 'lobsterai: no usable credential; log in first', code: 'MISSING_CREDENTIAL' } } },
+    })
+    repairState.originalText = '把 /api/sessions 那组路由都去掉'
+    sessionNotify()
+  })
+  const retry = retryButtonOf(host)
+  console.log('reopened turn : retry=%s title=%s', retry === null ? 'none' : 'PRESENT', JSON.stringify(retry?.title))
+  if (retry === null) throw new Error('a failed turn in the log must offer the retry on arrival')
+  // The message the provider reported is the tooltip's evidence, not decoration.
+  if (!/MISSING_CREDENTIAL|lobsterai/.test(retry.title)) {
+    throw new Error(`the retry must carry the failure it answers, got ${JSON.stringify(retry.title)}`)
+  }
+  const before = repairCalls.prompts.length
+  await act(async () => { retry.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  const text = repairCalls.prompts[before]?.content?.[0]?.text ?? ''
+  console.log('reopened send : %s', JSON.stringify(text.slice(0, 60)) + '…')
+  // The failing turn is still in the transcript, so the words alone would read
+  // as a second identical instruction: they are carried under a line saying so.
+  if (!text.includes('把 /api/sessions 那组路由都去掉')) {
+    throw new Error('a reopened turn must replay the request that failed')
+  }
+  if (!/failed|失败/i.test(text)) {
+    throw new Error(`the replay must say the turn failed, got ${JSON.stringify(text)}`)
+  }
+  await act(async () => { root.unmount() })
+}
+
+// 13b.2. The same row disappears when the turn the reader last ran is not a
+//       failure: an older error is history the conversation has gone past.
+{
+  const { host, root } = await failoverMount({}, CLEAN)
+  await act(async () => {
+    repairLog.push(
+      { type: 'turn/end', data: { turn: 1, reason: { kind: 'error', error: { message: 'timed out', code: 'TIMEOUT' } } } },
+      { type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
+    )
+    sessionNotify()
+  })
+  console.log('past failure  : retry=%s', retryButtonOf(host) === null ? 'none' : 'PRESENT')
+  if (retryButtonOf(host) !== null) throw new Error('a failure a later turn moved past must not be re-runnable')
+  await act(async () => { root.unmount() })
+}
+
+// 13b.3. With a fallback designated the switch owns the failure, so the
+//       same-model retry stays out of the way — one failure, one repair.
+{
+  const { host, root } = await failoverMount(seedFallback, CLEAN)
+  await act(async () => {
+    repairState.snapshot = AGENT_FAILURE.snapshot
+    sessionNotify()
+  })
+  // The automatic escalation has already switched to the fallback by now, and
+  // it retires the button once it has — that pairing is pinned in section 14.
+  // This case only asks whether the retry shows up next to the switch; it asks
+  // from the moment the failure lands.
+  const autoNote = host.querySelector('.dsh-mp2-autoNote')?.textContent ?? null
+  console.log('with fallback : retry=%s failover=%s auto=%s', retryButtonOf(host) === null ? 'none' : 'PRESENT', buttonOf(host) === null ? 'none' : 'PRESENT', JSON.stringify(autoNote))
+  if (retryButtonOf(host) !== null) throw new Error('a designated fallback must own the failure, not the same-model retry')
+  // Either the switch is offered, or the automatic escalation already took it
+  // and left its report. Both mean the failure is owned by the fallback; the
+  // one thing that must not happen is the same-model retry beside them.
+  if (buttonOf(host) === null && autoNote === null) {
+    throw new Error('with a fallback the failure must be owned by the switch, offered or already taken')
+  }
   await act(async () => { root.unmount() })
 }
 

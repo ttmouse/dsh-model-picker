@@ -175,6 +175,59 @@ Every model row carries a `☆` / `★` toggle **after the model name**, and aft
 - Favorites are keyed on the **route** (`provider/modelId`), not the bare model id: one model id is routinely served by several configured providers, and favoriting one route says nothing about the others.
 - They live in `localStorage` under `dsh.modelPicker.favorites`, the same place the shipped conversation plugin keeps its own view and width preferences. A storage refusal (private mode, full quota) is swallowed: the in-memory set still tracks the page.
 
+## Retry on the same model (the failure row's own button)
+
+The Host draws one line in the transcript — `This turn failed` — and stops there.
+Switching into that conversation, the reader is looking straight at the red row
+and has nothing to press: to try once more they have to type "retry" into the
+composer themselves. This puts the **Retry** button under that row, above the
+composer.
+
+**The narrowest repair there is.** It does not switch the model, does not touch
+the fallback, and changes nothing the user chose — it re-sends the failed turn on
+the **model already in use**. Because nothing has to be configured first, it needs
+no setup: it is there with no fallback designated, and it is there on a
+conversation opened cold from history.
+
+**The cold open is the whole point.** That failure is not in the session
+snapshot — it is **durable history**, and the Host draws the red row from
+`turn/end`'s `reason.error`. So the panel reads the same fact: when the latest
+`turn/end` ended with `kind:'error'` the retry is offered; when it ended
+`completed` it is not, because the conversation has already moved past that
+failure and re-running it would walk backwards. The tooltip carries the
+provider's own words (`lobsterai: no usable credential; log in first`), so the
+reason is legible before anything is pressed.
+
+**Three failure shapes, three submissions.** Same discrimination as the failover
+button, different action:
+
+| Failure | Signal | What the retry sends |
+| --- | --- | --- |
+| **Send** — the request never left the client | `promptError.op === 'send'` | **The original words**, read back from the session log |
+| **The turn died on the model** — the Host drew the red row | the latest `turn/end`'s `reason.error` | **The original words under one line saying the turn failed** |
+| **Agent failure** — no recoverable words | `lastAgentError` | **The resumption instruction**: check what completed, then carry on |
+
+That middle line earns its place: the failing turn is still in the transcript,
+so the words alone would read to the model as a second, identical instruction;
+"this turn failed — retry once" followed by the same request is what makes it the
+same request tried again.
+
+**It never fights the fallback over one failure.** With a fallback designated
+that failure belongs to `Retry with the fallback` (and to the automatic
+escalation), and this button does not appear — two repairs over one event is how
+a turn ends up run twice, once on the old model and once on the new one. With no
+fallback the reverse holds: this is the only repair offered.
+
+**The press does not flicker.** Admitting a prompt is a round trip, and until it
+settles the failure still reads as live, which would re-arm the button the user
+just pressed. So the press disables it (the row stays, only the button goes
+inert), a second press cannot queue the same turn again, and the arm is reset once
+the failure really clears — the next failure is a new question.
+
+To shoot it: `node scripts/screenshot-retry.mjs` (writes `live-retry.png`,
+`live-retry-disarmed.png` and `live-retry-with-fallback.png` from the same seat
+and store `npm test` uses, rendered in real Chromium).
+
 ## Failover (one click to recover a failed turn)
 
 The scenario: a turn dies — the route ran out of quota, got rate limited, or the
@@ -185,9 +238,8 @@ and then retype "continue". That retyping is what this removes.
 ordinary model switching at all. Nothing is rendered on a healthy session: there
 is no standing toggle to arm, no per-row mark, no menu entry. Instead a small
 button appears beside the composer **only while a failure is live**, and only
-when a fallback model has been designated. With either half missing the control
-does not exist — so "no fallback set" means no button, never a button that cannot
-act.
+when a fallback model has been designated. With no fallback the switch does not
+exist — the same-model retry above takes that case instead.
 
 **One click does both halves.** The button switches to the fallback model and
 then sends the repair. The switch is committed first and awaited, because sending
@@ -233,7 +285,8 @@ designated fallback that is not the model that just failed, sends the same
 repair, and says which model it moved to. Four guards keep that from being
 reckless: a user pressing stop never escalates (an interrupted turn is not an
 error, and re-sending it would fight the cancel); an install with no fallback
-designated stays completely passive; a failure already in the log when the panel
+designated stays completely passive — that case belongs to the same-model retry,
+which never fires by itself; a failure already in the log when the panel
 attaches is history being opened, not a turn that just broke; and a failure that
 is already on the fallback, or that has already been escalated for, is left to
 the user. The announcement is a report rather than a button — the repair is
@@ -427,7 +480,17 @@ colour changes stay, because they aid comprehension rather than being motion.
   Failover is asserted on both sides, and the negative side carries the most
   weight because the whole point is that a rare failure must not disturb ordinary
   switching: a clean session renders **no button at all** (with and without a
-  fallback set), and a live failure with no fallback set renders none either. On
+  fallback set), and a live failure with no fallback set renders no *switch* — the
+  same-model retry takes that case instead, sends one queued prompt carrying the
+  original words, switches nothing, and a second press while the admission is in
+  flight does not queue it again. The reopened conversation is pinned separately,
+  because it is the report that started this: a `turn/end` whose reason is
+  `error` puts the retry on screen without any healthy-to-failed edge to wait
+  for, its tooltip carries the provider's message, and the replay is the failed
+  request under a line saying the turn failed; a later `completed` turn retires
+  it, since that failure is history the conversation has moved past; and with a
+  fallback designated the retry never shows up beside the switch or its automatic
+  escalation. On
   the positive side one click must both switch to the fallback and send the
   repair, in that order; a send failure replays the original words while an agent
   failure sends the resumption instruction under a different label; a final
