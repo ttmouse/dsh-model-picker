@@ -1,0 +1,200 @@
+{
+  "schema": "dsh-model-picker/named-routes/v1",
+  "gateway": "http://127.0.0.1:8326/v1",
+  "at": "2026-10-18T08:49:45.551Z",
+  "timeoutMs": 20000,
+  "results": [
+    {
+      "route": "buddy/deepseek-v4.1-flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 2016,
+      "at": "2026-10-18T08:49:07.858Z"
+    },
+    {
+      "route": "codearts/deepseek-v4.1-flash",
+      "status": "TIMEOUT",
+      "code": "timeout",
+      "detail": "20000ms 无响应",
+      "ms": 20003,
+      "at": "2026-10-18T08:49:25.877Z"
+    },
+    {
+      "route": "loomy/DeepSeek-V4.1-Flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 5414,
+      "at": "2026-10-18T08:49:11.289Z"
+    },
+    {
+      "route": "magpie/trae-cn/deepseek-v4.1-flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 2936,
+      "at": "2026-10-18T08:49:10.795Z"
+    },
+    {
+      "route": "magpie/workbuddy/deepseek-v4.1-flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 2365,
+      "at": "2026-10-18T08:49:13.160Z"
+    },
+    {
+      "route": "lobsterai/deepseek-flash",
+      "status": "NO_QUOTA",
+      "code": "QUOTA_EXCEEDED",
+      "detail": "lobsterai: 模型 deepseek-flash 所有账号均不可用（免费额度已用完，请升级套餐）",
+      "ms": 248,
+      "at": "2026-10-18T08:49:11.537Z"
+    },
+    {
+      "route": "qoder/dmodel",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 1508,
+      "at": "2026-10-18T08:49:13.045Z"
+    },
+    {
+      "route": "qoder/dfmodel",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 1250,
+      "at": "2026-10-18T08:49:14.295Z"
+    },
+    {
+      "route": "magpie/workbuddy-ai/deepseek-v4.1-flash",
+      "status": "MODEL_MISSING",
+      "code": "model_not_found",
+      "detail": "模型不存在",
+      "ms": 2,
+      "at": "2026-10-18T08:49:13.162Z"
+    },
+    {
+      "route": "magpie/workbuddy-ai/glm-5.3",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 2749,
+      "at": "2026-10-18T08:49:15.911Z"
+    },
+    {
+      "route": "minimax/MiniMax-M3.1-Flash-Preview",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 2792,
+      "at": "2026-10-18T08:49:17.087Z"
+    },
+    {
+      "route": "buddy/glm-5.3",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 2115,
+      "at": "2026-10-18T08:49:18.026Z"
+    },
+    {
+      "route": "buddy/glm-5.3-flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 1294,
+      "at": "2026-10-18T08:49:18.381Z"
+    },
+    {
+      "route": "codearts/glm-5.3-flash",
+      "status": "TIMEOUT",
+      "code": "timeout",
+      "detail": "20000ms 无响应",
+      "ms": 20001,
+      "at": "2026-10-18T08:49:38.027Z"
+    },
+    {
+      "route": "loomy/GLM-5.3-Flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 6434,
+      "at": "2026-10-18T08:49:24.815Z"
+    },
+    {
+      "route": "lobsterai/glm-5.3",
+      "status": "ERROR",
+      "code": "SERVER",
+      "detail": "lobsterai: 模型 glm-5.3 所有账号均不可用（模型不可见或无访问权限: glm-5.3）",
+      "ms": 176,
+      "at": "2026-10-18T08:49:24.991Z"
+    },
+    {
+      "route": "lobsterai/glm-5.3-flash",
+      "status": "NO_QUOTA",
+      "code": "QUOTA_EXCEEDED",
+      "detail": "lobsterai: 模型 glm-5.3-flash 所有账号均不可用（免费额度已用完，请升级套餐）",
+      "ms": 114,
+      "at": "2026-10-18T08:49:25.105Z"
+    },
+    {
+      "route": "magpie/group/auto-glm-5-3",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 3413,
+      "at": "2026-10-18T08:49:28.518Z"
+    },
+    {
+      "route": "magpie/group/auto-glm-5-3-flash",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 3607,
+      "at": "2026-10-18T08:49:29.484Z"
+    },
+    {
+      "route": "magpie-responses/grok/grok-4.7",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 17033,
+      "at": "2026-10-18T08:49:45.551Z"
+    },
+    {
+      "route": "magpie/cursor/grok-4.7@500k",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 5859,
+      "at": "2026-10-18T08:49:35.343Z"
+    },
+    {
+      "route": "magpie/cursor/claude-opus-5-5@1m",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 4020,
+      "at": "2026-10-18T08:49:39.363Z"
+    },
+    {
+      "route": "magpie/cursor/gpt-5.5@1m",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 3139,
+      "at": "2026-10-18T08:49:41.166Z"
+    },
+    {
+      "route": "magpie/cursor/gemini-4-argon",
+      "status": "OK",
+      "code": "-",
+      "detail": "",
+      "ms": 4933,
+      "at": "2026-10-18T08:49:44.296Z"
+    }
+  ]
+}
