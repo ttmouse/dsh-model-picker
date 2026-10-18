@@ -1781,6 +1781,10 @@ async function addFallbackCandidate(host, needle) {
 /** The probe button on the first queued row. */
 const probeButtonOf = (host) => host.querySelector('.dsh-mp2-fallbackItem .dsh-mp2-fallbackTest')
 
+/** The trailing result mark on the first queued row — where the answer's
+ *  wording and its state class live (the action button is a bare glyph). */
+const probeMarkOf = (host) => host.querySelector('.dsh-mp2-fallbackItem .dsh-mp2-fallbackMark')
+
 /** Let a fetch-backed probe settle: its result arrives through microtasks. */
 const flushProbe = async () => { await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 0) }) }) }
 
@@ -1832,8 +1836,8 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     if (entry.source !== 'test' || entry.error !== 'timeout') {
       throw new Error(`the record must say what probed it and what it said, got ${JSON.stringify(entry)}`)
     }
-    if (!probeButtonOf(host).textContent.includes('Failed')) {
-      throw new Error('the button must keep showing the failed result')
+    if (!probeMarkOf(host).textContent.includes('Failed')) {
+      throw new Error('the mark must keep showing the failed result')
     }
     await act(async () => { root.unmount() })
 
@@ -1843,7 +1847,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
       'dsh.modelPicker.failures': JSON.stringify({ 'zhipu/glm-4.6': entry }),
     }, CLEAN)
     await openFallbackPage(second.host)
-    const again = probeButtonOf(second.host)
+    const again = probeMarkOf(second.host)
     console.log('after remount : label=%s', JSON.stringify(again?.textContent ?? null))
     if (again === null || !again.textContent.includes('Failed')) {
       throw new Error('a recorded failure must still show after the page is reopened')
@@ -1851,7 +1855,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     // A probe that answers clears the record: the row must not go on calling a
     // live channel dead.
     probe.body = { ok: true, ms: 90 }
-    await act(async () => { again.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await act(async () => { probeButtonOf(second.host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
     await flushProbe()
     console.log('after a pass  : ledger=%s', JSON.stringify(ledgerOf()))
     if (ledgerOf()?.['zhipu/glm-4.6'] !== undefined) throw new Error('a route that answered must lose its stamp')
@@ -1884,16 +1888,16 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     await addFallbackCandidate(host, 'GLM-4.6')
     await act(async () => { probeButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
     await flushProbe()
-    const button = probeButtonOf(host)
+    const button = probeMarkOf(host)
     console.log('quota label   : %s | %s', JSON.stringify(button.textContent), JSON.stringify(button.getAttribute('title')))
     if (!button.textContent.includes('额度耗尽')) {
       throw new Error(`a spent balance must say so on the row, got ${JSON.stringify(button.textContent)}`)
     }
-    if (button.className.includes('dsh-mp2-fallbackTest-fail')) {
+    if (button.className.includes('dsh-mp2-fallbackMark-error')) {
       throw new Error('a classified failure must not wear the generic failure class')
     }
-    if (!button.className.includes('dsh-mp2-fallbackTest-quota')) {
-      throw new Error(`the button must wear its own state class, got ${JSON.stringify(button.className)}`)
+    if (!button.className.includes('dsh-mp2-fallbackMark-quota')) {
+      throw new Error(`the mark must wear its own state class, got ${JSON.stringify(button.className)}`)
     }
     // The tooltip explains what the class means for the reader, and still
     // carries the provider's own words: the class is the routing decision, the
@@ -1916,7 +1920,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
       'dsh.modelPicker.failures': JSON.stringify({ 'zhipu/glm-4.6': stored }),
     }, CLEAN)
     await openFallbackPage(second.host)
-    const again = probeButtonOf(second.host)
+    const again = probeMarkOf(second.host)
     console.log('after remount : label=%s', JSON.stringify(again?.textContent ?? null))
     if (again === null || !again.textContent.includes('额度耗尽')) {
       throw new Error(`a remembered quota failure must reopen as 额度耗尽, got ${JSON.stringify(again?.textContent ?? null)}`)
@@ -1925,9 +1929,9 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     // …and the other classes are distinct states, not one "not ok" bucket.
     for (const [state, expected] of [['rate', '限流'], ['auth', '认证失败'], ['timeout', '超时'], ['error', '不通']]) {
       probe.body = { ok: false, state, error: 'provider said something' }
-      await act(async () => { again.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+      await act(async () => { probeButtonOf(second.host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
       await flushProbe()
-      const label = probeButtonOf(second.host).textContent
+      const label = probeMarkOf(second.host).textContent
       console.log('state %s ->', state.padEnd(8), JSON.stringify(label))
       if (!label.includes(expected)) throw new Error(`state ${state} must read as ${expected}, got ${JSON.stringify(label)}`)
     }
@@ -1936,7 +1940,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     probe.body = { ok: false, error: 'legacy host' }
     await act(async () => { probeButtonOf(second.host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
     await flushProbe()
-    if (!probeButtonOf(second.host).textContent.includes('不通')) {
+    if (!probeMarkOf(second.host).textContent.includes('不通')) {
       throw new Error('an older host without a state field must degrade to the generic failure')
     }
     await act(async () => { second.root.unmount() })
@@ -1946,6 +1950,60 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     // case in this file reads the English copy.
     localeActive = 'en'
     document.documentElement.lang = 'en'
+  }
+}
+
+// 13k.4. The fallback page's own batch button: one press walks every route on
+//        the list, each row wears the same answer a single press would leave,
+//        the ledger only keeps what failed, and the receipt counts the run.
+{
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).includes('/api/model-picker/test')) return realFetch(url, init)
+    const sent = JSON.parse(init.body)
+    const route = sent.provider + '/' + sent.model
+    return route === 'zhipu/glm-4.6'
+      ? { ok: true, json: async () => ({ ok: false, state: 'quota', error: 'insufficient balance' }) }
+      : { ok: true, json: async () => ({ ok: true, ms: 60 }) }
+  }
+  try {
+    const { host, root } = await failoverMount({}, CLEAN)
+    await openFallbackPage(host)
+    await addFallbackCandidate(host, 'GLM-4.6')
+    await addFallbackCandidate(host, 'Qwen3 Max')
+    const batch = () => host.querySelector('.dsh-mp2-fallbackProbe')
+    if (batch() === null) throw new Error('a queue with routes must offer the batch button')
+    if (batch().textContent !== 'Test all') {
+      throw new Error(`the idle label must be Test all, got ${JSON.stringify(batch().textContent)}`)
+    }
+    await act(async () => { batch().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
+    await flushProbe()
+    await flushProbe()
+    const labels = [...host.querySelectorAll('.dsh-mp2-fallbackItem .dsh-mp2-fallbackMark')].map((node) => node.textContent)
+    const note = host.querySelector('.dsh-mp2-menuHeaderGroup .dsh-mp2-probeNote')
+    console.log('batch run     : labels=%s note=%s', JSON.stringify(labels), JSON.stringify(note?.textContent ?? null))
+    if (labels.length !== 2) throw new Error(`both rows must have been probed, got ${labels.length}`)
+    if (!labels[0].includes('Out of quota')) {
+      throw new Error(`the failed row must wear its class, got ${JSON.stringify(labels[0])}`)
+    }
+    if (!labels[1].includes('OK')) {
+      throw new Error(`the passing row must wear its answer, got ${JSON.stringify(labels[1])}`)
+    }
+    if (ledgerOf()?.['zhipu/glm-4.6']?.state !== 'quota') {
+      throw new Error('a route the batch failed must land in the ledger')
+    }
+    if (ledgerOf()?.['17an/qwen3-max'] !== undefined) {
+      throw new Error('a route that answered must not be stamped')
+    }
+    if (note === null || !note.textContent.includes('Checked 2/2') || !note.textContent.includes('failed 1')) {
+      throw new Error('a finished run must report its tally on the page')
+    }
+    if (batch().textContent !== 'Test all') {
+      throw new Error(`a finished run must hand the button back, got ${JSON.stringify(batch().textContent)}`)
+    }
+    await act(async () => { root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
   }
 }
 

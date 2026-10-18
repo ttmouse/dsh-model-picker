@@ -38,19 +38,61 @@ const HEADLESS_SHELL = join(homedir(), 'Library/Caches/ms-playwright/chromium_he
 const { chromium } = createRequire(join(homedir(), '.npm-global/lib/node_modules/playwright/index.js'))('playwright')
 
 const browser = await chromium.launch({ executablePath: HEADLESS_SHELL })
-const context = await browser.newContext({ viewport: { width: 1000, height: 780 } })
+const context = await browser.newContext({ viewport: { width: 1000, height: 1100 } })
 await context.setExtraHTTPHeaders({ cookie: sessionCookie() })
+
+// Swap the picker's segment of the served bundle for the checkout's file —
+// the app serves an immutable snapshot from process start, so a fresh edit
+// needs this to be what a live page runs (see screenshot-fallback-probe.mjs).
+import { readFileSync as _rf } from 'node:fs'
+const NEW_CLIENT = _rf(new URL('../lib/client.js', import.meta.url), 'utf8')
+await context.route((url) => url.href.includes('/plugins/??'), async (route) => {
+  const response = await route.fetch()
+  const body = await response.text()
+  if (!body.includes("load({ id: 'dsh-model-picker'") || body.includes('dsh-mp2-fallbackMark')) {
+    return route.fulfill({ response })
+  }
+  const MARK = "window.__ModuleLoader__.load({ id: '"
+  const start = body.indexOf(MARK + "dsh-model-picker'")
+  const next = body.indexOf(MARK, start + MARK.length)
+  return route.fulfill({ response, body: body.slice(0, start) + NEW_CLIENT + (next === -1 ? '' : body.slice(next)) })
+})
+
 const page = await context.newPage()
 
-// The five routes and the class each one answers with. The model ids are real
-// ones this profile has wired; the stub only replaces the answer.
-const ROWS = [
-  ['group/auto-glm-5-3-flash', { ok: false, state: 'quota', error: 'insufficient balance' }, ''],
-  ['group/auto-deepseek-v4-1-flash', { ok: false, state: 'rate', error: 'Rate limit reached for requests' }, ''],
-  ['group/auto-gpt-5', { ok: false, state: 'auth', error: 'invalid api key provided' }, ''],
-  ['group/auto-grok-4', { ok: false, state: 'timeout', error: 'timeout' }, ''],
-  ['group/auto-qwen3-max', { ok: false, state: 'error', error: 'stream ended unexpectedly' }, ''],
-]
+// The queue must name models this session's directory actually has, or the
+// rows fall back to raw route ids: first pass asks the host for the real
+// directory and picks one route per provider, then reload installs the stub.
+await page.goto(ORIGIN, { waitUntil: 'domcontentloaded' })
+await page.waitForSelector('.dsh-mp2-root', { timeout: 30_000 })
+const ROUTES = await page.evaluate(async () => {
+  const body = await (await fetch('/api/model-picker/models')).json()
+  const rows = body.models ?? body.rows ?? body
+  const picked = []
+  const seen = new Set()
+  for (const row of rows) {
+    if (seen.has(row.provider)) continue
+    seen.add(row.provider)
+    picked.push(row.provider + '/' + row.id)
+    if (picked.length === 5) break
+  }
+  return picked
+})
+if (ROUTES.length < 5) throw new Error(`the directory offered only ${ROUTES.length} routes`)
+
+// The five routes and the class each one answers with.
+const STATES = ['quota', 'rate', 'auth', 'timeout', 'error']
+const ERRORS = {
+  quota: 'insufficient balance',
+  rate: 'Rate limit reached for requests',
+  auth: 'invalid api key provided',
+  timeout: 'timeout',
+  error: 'stream ended unexpectedly',
+}
+const ROWS = ROUTES.map((route, index) => {
+  const state = STATES[index]
+  return [route, { ok: false, state, error: ERRORS[state] }]
+})
 
 await page.addInitScript((rows) => {
   // One route per provider so every row resolves to a real model row, and a
@@ -74,16 +116,23 @@ await page.addInitScript((rows) => {
   }
 }, ROWS)
 
-await page.goto(ORIGIN, { waitUntil: 'domcontentloaded' })
+await page.reload({ waitUntil: 'domcontentloaded' })
 await page.waitForTimeout(6000)
 
 const root = await page.$('.dsh-mp2-root')
 if (root === null) throw new Error('the picker never mounted — is the plugin loaded?')
 
+// The shell's onboarding overlays swallow pointer events; this is a disposable
+// headless profile, so they go away, and every press is a DOM click.
+await page.evaluate(() => {
+  document.querySelectorAll('[data-dam-theme="dialogs"], [data-dam-tour-head]').forEach((node) => node.remove())
+})
+const domClick = (sel) => page.evaluate((s) => document.querySelector(s)?.click(), sel)
+
 // Open the popup, then the fallback manager.
-await page.click('.dsh-mp2-triggerLeft')
+await domClick('.dsh-mp2-triggerLeft')
 await page.waitForSelector('.dsh-mp2-list', { timeout: 5000 })
-await page.click('.dsh-mp2-footerFallback')
+await domClick('.dsh-mp2-footerFallback')
 await page.waitForSelector('.dsh-mp2-fallbackPage', { timeout: 5000 })
 await page.waitForTimeout(300)
 
@@ -91,14 +140,12 @@ const rows = await page.$$('.dsh-mp2-fallbackItem')
 if (rows.length === 0) throw new Error('the manager has no rows to probe')
 console.log('rows           :', rows.length)
 
-// Probe every row and wait for the labels to settle. The actions are revealed
-// by hovering the row (they are hidden at rest so the list stays readable), so
-// each probe has to be preceded by its own hover.
-for (const row of rows) {
-  await row.hover()
-  await page.waitForTimeout(120)
-  const button = await row.$('.dsh-mp2-fallbackTest')
-  if (button !== null) await button.click()
+// Probe every row and wait for the labels to settle. The presses are DOM
+// clicks (the actions are hover-revealed, and a pointer click can miss a row
+// the hover just scrolled).
+const rowButtons = await page.$$('.dsh-mp2-fallbackItem .dsh-mp2-fallbackTest')
+for (const button of rowButtons) {
+  await button.evaluate((node) => node.click())
 }
 await page.waitForTimeout(1200)
 
@@ -108,9 +155,9 @@ await rows[0].hover()
 await page.waitForTimeout(600)
 
 const painted = await page.$$eval('.dsh-mp2-fallbackItem', (items) => items.map((item) => ({
-  label: item.querySelector('.dsh-mp2-fallbackTest')?.textContent ?? null,
-  color: getComputedStyle(item.querySelector('.dsh-mp2-fallbackTest')).color,
-  title: item.querySelector('.dsh-mp2-fallbackTest')?.getAttribute('title') ?? null,
+  label: item.querySelector('.dsh-mp2-fallbackMark')?.textContent ?? null,
+  color: item.querySelector('.dsh-mp2-fallbackMark') === null ? null : getComputedStyle(item.querySelector('.dsh-mp2-fallbackMark')).color,
+  title: item.querySelector('.dsh-mp2-fallbackMark')?.getAttribute('title') ?? null,
 })))
 console.log('--- painted states ---')
 for (const state of painted) console.log(JSON.stringify(state))
