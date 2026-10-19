@@ -842,6 +842,8 @@ if (!foldedModels.includes('DeepSeek Reasoner (modlens vision)')) throw new Erro
 
 const visionOption = [...container.querySelectorAll('.dsh-mp2-list .dsh-mp2-option')]
   .find(option => option.querySelector('.dsh-mp2-modelName')?.textContent === 'DeepSeek Reasoner (modlens vision)')
+if (visionOption === undefined) throw new Error('folded model row missing')
+
 // 7b. The box takes a phrase, not a word (`-19`). `flash 4.1` is two terms
 //     and the list must narrow to rows carrying BOTH — the bug being that the
 //     whole string was matched as one substring, so a two-word query returned
@@ -2159,9 +2161,14 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     await addFallbackCandidate(host, 'GLM-4.6')
     await addFallbackCandidate(host, 'Qwen3 Max')
     const batch = () => host.querySelector('.dsh-mp2-fallbackProbe')
+    // Idle the button is a square glyph: the name lives in the aria-label (and
+    // the tooltip), the text slot is empty, and the icon is drawn inside.
+    const idleBatchOk = (button) => button.getAttribute('aria-label') === 'Test all'
+      && button.textContent === ''
+      && button.querySelector('svg') !== null
     if (batch() === null) throw new Error('a queue with routes must offer the batch button')
-    if (batch().textContent !== 'Test all') {
-      throw new Error(`the idle label must be Test all, got ${JSON.stringify(batch().textContent)}`)
+    if (!idleBatchOk(batch())) {
+      throw new Error(`the idle batch button must be the Test all glyph, got label=${JSON.stringify(batch().getAttribute('aria-label'))} text=${JSON.stringify(batch().textContent)}`)
     }
     await act(async () => { batch().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
     await flushProbe()
@@ -2176,6 +2183,11 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     if (!labels[1].includes('OK')) {
       throw new Error(`the passing row must wear its answer, got ${JSON.stringify(labels[1])}`)
     }
+    // The round trip is the host's own millisecond measurement, printed as
+    // such: 60ms must read "60ms", not collapse to "0.1s".
+    if (!labels[1].includes('60ms')) {
+      throw new Error(`the pass must report its round trip in milliseconds, got ${JSON.stringify(labels[1])}`)
+    }
     if (ledgerOf()?.['zhipu/glm-4.6']?.state !== 'quota') {
       throw new Error('a route the batch failed must land in the ledger')
     }
@@ -2185,8 +2197,8 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     if (note === null || !note.textContent.includes('Checked 2/2') || !note.textContent.includes('failed 1')) {
       throw new Error('a finished run must report its tally on the page')
     }
-    if (batch().textContent !== 'Test all') {
-      throw new Error(`a finished run must hand the button back, got ${JSON.stringify(batch().textContent)}`)
+    if (!idleBatchOk(batch())) {
+      throw new Error(`a finished run must hand the glyph button back, got label=${JSON.stringify(batch().getAttribute('aria-label'))} text=${JSON.stringify(batch().textContent)}`)
     }
     await act(async () => { root.unmount() })
   } finally {
@@ -2457,8 +2469,11 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     const manualOrder = namesOf(host)
     console.log('manual order  : %s', JSON.stringify(manualOrder))
     if (sortButtonOf(host) === null) throw new Error('the queue must offer a sort switch')
-    if (!sortButtonOf(host).textContent.includes('Manual')) {
-      throw new Error(`the switch must name the mode in use, got ${JSON.stringify(sortButtonOf(host).textContent)}`)
+    // The switch is a square glyph that names the mode it is IN through the
+    // aria-label; the glyph states the mode, the text slot stays empty.
+    const sortModeOf = (host) => sortButtonOf(host).getAttribute('aria-label')
+    if (sortModeOf(host) !== 'Manual') {
+      throw new Error(`the switch must name the mode in use, got label=${JSON.stringify(sortModeOf(host))} text=${JSON.stringify(sortButtonOf(host).textContent)}`)
     }
 
     // Probe every row, then flip to automatic.
@@ -2469,9 +2484,9 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     await flushProbe()
     await act(async () => { sortButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
     const autoOrder = namesOf(host)
-    console.log('auto order    : %s (switch=%s)', JSON.stringify(autoOrder), JSON.stringify(sortButtonOf(host).textContent))
-    if (sortButtonOf(host).textContent.includes('Manual') === false && !sortButtonOf(host).textContent.includes('Auto')) {
-      throw new Error('the switch must name the automatic mode once it is on')
+    console.log('auto order    : %s (switch=%s)', JSON.stringify(autoOrder), JSON.stringify(sortModeOf(host)))
+    if (sortModeOf(host) !== 'Auto') {
+      throw new Error(`the switch must name the automatic mode once it is on, got ${JSON.stringify(sortModeOf(host))}`)
     }
     if (autoOrder.length !== 3) throw new Error(`automatic order must keep every row, got ${autoOrder.length}`)
     if (autoOrder[0] !== 'Qwen3 Max' || autoOrder[1] !== 'GLM-4.6') {
