@@ -2285,6 +2285,67 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   await act(async () => { root.unmount() })
 }
 
+// 13k.4b-auto. Automatic sort must not unpress the row: the queue there is
+//              ordered by the answers, so a drag may not reorder — but a press
+//              still commits the row's model. (This is the regression that made
+//              a click dead in auto mode while Enter kept working: the pointer
+//              was only armed in manual mode.)
+{
+  const { host, root } = await failoverMount({
+    'dsh.modelPicker.fallback': JSON.stringify(['zhipu/glm-4.6', '17an/qwen3-max']),
+    'dsh.modelPicker.fallbackSort': 'auto',
+  })
+  await openFallbackPage(host)
+  const rows = [...host.querySelectorAll('.dsh-mp2-fallbackItem')]
+  const pointer = (type, target, extra = {}) => {
+    const event = new dom.window.MouseEvent(type, { bubbles: true, cancelable: true, ...extra })
+    Object.defineProperties(event, {
+      isPrimary: { value: true }, pointerType: { value: 'mouse' }, button: { value: 0 },
+      pointerId: { value: 1 }, clientX: { value: 10 }, clientY: { value: 10 },
+    })
+    target.dispatchEvent(event)
+  }
+  console.log('auto rows     : n=%d roles=%s classes=%s', rows.length,
+    JSON.stringify(rows.map((row) => row.getAttribute('role'))),
+    JSON.stringify(rows.map((row) => row.className.includes('dsh-mp2-fallbackItemAuto'))))
+  if (rows.length !== 2) throw new Error(`the auto-sorted queue must draw both routes, got ${rows.length}`)
+  if (rows.some((row) => row.getAttribute('role') !== 'button')) {
+    throw new Error('an auto-sorted queued row must still be a pressable control')
+  }
+  const dragRef = plugin.__testDragRef()
+
+  // A press in auto mode commits the model, exactly as in manual mode.
+  const before = selections.length
+  await act(async () => { pointer('pointerdown', rows[1]) })
+  if (dragRef.current === null) throw new Error('auto mode must still arm the pointer, or the row cannot be pressed')
+  await act(async () => { pointer('pointerup', rows[1]) })
+  console.log('auto press    : picks=%d last=%s', selections.length - before, JSON.stringify(selections.at(-1)))
+  if (selections.length !== before + 1) throw new Error('pressing a queued row in auto mode must submit that model')
+  if (selections.at(-1)?.provider !== '17an' || selections.at(-1)?.model !== 'qwen3-max') {
+    throw new Error(`the auto-mode press must submit the row it landed on, got ${JSON.stringify(selections.at(-1))}`)
+  }
+  if (host.querySelector('.dsh-mp2-fallbackPage') !== null) throw new Error('a committed auto-mode press must close the page')
+
+  // A travelling gesture in auto mode is not a drag and not a press: nothing
+  // reorders, nothing switches, and no hole is drawn.
+  await openFallbackPage(host)
+  const dragRows = [...host.querySelectorAll('.dsh-mp2-fallbackItem')]
+  const during = selections.length
+  await act(async () => { pointer('pointerdown', dragRows[0]) })
+  await act(async () => {
+    dragRef.current.dragging = true
+    pointer('pointermove', dragRows[0], { clientX: 40 })
+  })
+  if (dragRef.current?.dragging !== true) throw new Error('a travelling gesture in auto mode must disqualify itself as a press')
+  await act(async () => { pointer('pointerup', dragRows[0], { clientX: 40 }) })
+  console.log('auto drag     : picks=%d holes=%d', selections.length - during, host.querySelectorAll('.dsh-mp2-fallbackHole').length)
+  if (selections.length !== during) throw new Error('a drag in auto mode must not switch the model')
+  if (JSON.parse(dom.window.localStorage.getItem('dsh.modelPicker.fallback')).join(',') !== 'zhipu/glm-4.6,17an/qwen3-max') {
+    throw new Error('a drag in auto mode must not touch the stored order')
+  }
+  await act(async () => { root.unmount() })
+}
+
 // 13k.4c. The running row is marked where it stands. The mark has to sit on the
 //         name's line and share its midline (container alignment, not a margin
 //         nudge), and it must not survive when the row is not the current one —
