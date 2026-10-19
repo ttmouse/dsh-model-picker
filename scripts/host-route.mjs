@@ -327,6 +327,41 @@ if (strandedTest.status !== 200 || strandedTest.json.ok !== true) throw new Erro
     throw new Error('the quota route must fail open as an empty list')
   }
 
+  // A credit-balance account has no windows at all, so the figure itself is
+  // the whole answer the row can speak. The host must carry it through
+  // verbatim — currency included — instead of dropping it and leaving the row
+  // blank, and it must not invent one for a windowed account.
+  {
+    const realFetch = globalThis.fetch
+    const gateway = {
+      data: [
+        { provider: 'cline', name: 'Cline', kind: 'balance', balance: '$0.0096', windows: [] },
+        { provider: 'qoder', name: 'Qoder', kind: 'subscription', windows: [
+          { name: 'Add-on credits', used: 17, remaining: 83 },
+        ] },
+      ],
+    }
+    globalThis.fetch = async () => ({ ok: true, json: async () => gateway })
+    try {
+      // The cache is per process and holds the previous (unreachable) answer
+      // for five minutes, so this rows are read through a fresh module
+      // instance rather than the one every earlier case has been driving.
+      const fresh = await import(join(root, 'lib/host.js?balance-probe'))
+      const routes = new Map()
+      fresh.apply({ get: () => llm, webServer: { register: (route) => routes.set(route.path, route) } })
+      const rows = (await call(routes.get('/api/model-picker/quotas'), get)).json.quotas
+      const cline = rows.find((row) => row.provider === 'cline')
+      const qoder = rows.find((row) => row.provider === 'qoder')
+      console.log('balance row: %s | window row: %s', JSON.stringify(cline), JSON.stringify(qoder))
+      if (cline?.balance !== '$0.0096') throw new Error(`a balance-only account must carry its figure, got ${JSON.stringify(cline)}`)
+      if (cline.windows?.length !== 0) throw new Error('a balance-only account has no windows to invent')
+      if (qoder?.balance !== undefined) throw new Error('a windowed account must not gain a balance it never had')
+      if (qoder?.windows?.[0]?.remaining !== 83) throw new Error('window remainders must still round through')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  }
+
   // …and a real registration failure must stay loud. Swallowing everything
   // would hide a server that cannot serve this route at all, which is a
   // different problem from one that already serves it.

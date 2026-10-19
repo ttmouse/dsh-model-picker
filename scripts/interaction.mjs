@@ -1980,6 +1980,101 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   await act(async () => { root.unmount() })
 }
 
+// 13k.1b. A queued row says how much the account behind it has left. Quota is
+//         sold per supplier, not per model, so the number rides the detail line
+//         under the model name — beside the supplier name that owns it — and the
+//         tooltip names that account, so the line is not misread as this one
+//         model's own allowance. A credit balance with no windows shows its
+//         figure rather than a percent of an unknown ceiling.
+{
+  const realFetch = globalThis.fetch
+  const QUOTAS = { ok: true, quotas: [
+    { provider: '17an', name: '一起安 渠道', windows: [
+      { name: '5 hours', remaining: 84, hoursLeft: 2 },
+      { name: 'Weekly', remaining: 64, hoursLeft: 20 },
+    ] },
+    { provider: 'zhipu', name: '智谱 GLM', windows: [
+      { name: 'Monthly', remaining: 12, hoursLeft: 100, projectedWaste: 46 },
+    ] },
+    // The model list's own supplier column, so the base list is not left bare.
+    { provider: 'deepseek', name: 'DeepSeek', windows: [{ name: 'Weekly', remaining: 77, hoursLeft: 100 }] },
+    { provider: 'modlens-deepseek', name: 'DeepSeek (modlens vision)', windows: [{ name: 'Weekly', remaining: 77, hoursLeft: 100 }] },
+  ] }
+  // The quota snapshot is read once per page load and every mount in this file
+  // shares that one read. By the time this case runs, the page's own picker has
+  // long been mounted and that read has settled, so a stub that answers now is
+  // never asked. The snapshot is therefore dropped into the running page: an
+  // export on the module's own handle rewinds the one-shot read, the next mount
+  // performs it again, and the stub answers that one.
+  if (typeof plugin.__resetQuotas !== 'function') {
+    throw new Error('the client half must expose a test seam that rewinds the one-shot quota read')
+  }
+  plugin.__resetQuotas()
+  globalThis.fetch = async (url) => {
+    const href = String(url)
+    if (href.includes('/api/model-picker/quotas')) return { ok: true, json: async () => QUOTAS }
+    return { ok: true, json: async () => FACTS }
+  }
+  try {
+    const { host, root } = await failoverMount({}, CLEAN)
+    await flushProbe()
+    await openFallbackPage(host)
+    await addFallbackCandidate(host, 'GLM-4.6')
+    await addFallbackCandidate(host, 'Qwen3 Max')
+    await flushProbe()
+    const lines = [...host.querySelectorAll('.dsh-mp2-fallbackItem')].map((row) => {
+      const el = row.querySelector('.dsh-mp2-fallbackQuota')
+      return el === null ? null : { text: el.textContent, title: el.getAttribute('title'), risk: el.className.includes('QuotaRisk') }
+    })
+    console.log('queue quota   : %s', JSON.stringify(lines))
+    if (lines.some((line) => line === null)) throw new Error('every queued row must carry its account quota')
+    // The longest-horizon window is the one spoken for: its remainder and its
+    // horizon, never the short rolling window that loses nothing by rolling.
+    if (lines[1].text !== '64% · 20h') throw new Error(`the queue must read the weekly window, got ${JSON.stringify(lines[1].text)}`)
+    // 64% left with a reset in under a day is on track to die unspent.
+    if (!lines[1].risk) throw new Error('a window about to reset with most of it left must be flagged')
+    if (lines[0].text !== '12% · 5d') throw new Error(`a projection-flagged window reads its main remainder, got ${JSON.stringify(lines[0].text)}`)
+    if (!lines[0].risk) throw new Error('a projected waste must colour the number')
+    if ((lines[1].title ?? '').includes('5 hours') === false) {
+      throw new Error(`the tooltip must name every window, got ${JSON.stringify(lines[1].title)}`)
+    }
+    await act(async () => { root.unmount() })
+
+    // A credit balance: no windows at all, so the figure itself is the answer.
+    // The floor is swapped in the snapshot rather than pushed beside the old
+    // one, because the read keeps the first row per provider — and it has to
+    // be re-read, since the page holds the snapshot it already fetched.
+    QUOTAS.quotas.splice(0, QUOTAS.quotas.length,
+      { provider: '17an', name: '一起安 渠道', balance: '¥12.40', windows: [] })
+    plugin.__resetQuotas()
+    const balance = await failoverMount({ 'dsh.modelPicker.fallback': JSON.stringify(['17an/qwen3-max']) }, CLEAN)
+    await openFallbackPage(balance.host)
+    await flushProbe()
+    const figure = balance.host.querySelector('.dsh-mp2-fallbackItem .dsh-mp2-fallbackQuota')
+    console.log('credit line   : %s', JSON.stringify(figure?.textContent ?? null))
+    if (figure === null || figure.textContent !== '¥12.40') {
+      throw new Error(`a balance-only account must show its figure, got ${JSON.stringify(figure?.textContent ?? null)}`)
+    }
+    if ((figure.getAttribute('title') ?? '').includes('%')) {
+      throw new Error('a balance has no percentage to speak of')
+    }
+    await act(async () => { balance.root.unmount() })
+
+    // No gateway, no quota row: the line is absent, not a zero or an error.
+    QUOTAS.quotas.length = 0
+    plugin.__resetQuotas()
+    const bare = await failoverMount({ 'dsh.modelPicker.fallback': JSON.stringify(['17an/qwen3-max']) }, CLEAN)
+    await openFallbackPage(bare.host)
+    await flushProbe()
+    if (bare.host.querySelector('.dsh-mp2-fallbackQuota') !== null) {
+      throw new Error('a provider the gateway does not know must not wear a quota')
+    }
+    await act(async () => { bare.root.unmount() })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+}
+
 // 13k.2. A probe that comes back failed stamps the route with the time it
 //        failed. The stamp is the point: it has to survive closing the page,
 //        because the answer gets read later, when someone is choosing a model.
@@ -1991,6 +2086,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     : realFetch(url, init))
   try {
     const { host, root } = await failoverMount({}, CLEAN)
+    await flushProbe()
     await openFallbackPage(host)
     await addFallbackCandidate(host, 'GLM-4.6')
     await act(async () => { probeButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
@@ -2051,6 +2147,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   localeActive = 'zh'
   try {
     const { host, root } = await failoverMount({}, CLEAN)
+    await flushProbe()
     await openFallbackPage(host)
     await addFallbackCandidate(host, 'GLM-4.6')
     await act(async () => { probeButtonOf(host).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) })
@@ -2157,6 +2254,7 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
   }
   try {
     const { host, root } = await failoverMount({}, CLEAN)
+    await flushProbe()
     await openFallbackPage(host)
     await addFallbackCandidate(host, 'GLM-4.6')
     await addFallbackCandidate(host, 'Qwen3 Max')
