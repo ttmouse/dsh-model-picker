@@ -70,14 +70,14 @@ await page.waitForSelector('.dsh-mp2-root', { timeout: 30_000 })
 // Prefer the floors the local gateway actually bills (magpie, qoder, cline,
 // our-free-model), because those are the ones carrying a quota; fall back to
 // whatever the directory offers if a gateway floor is not configured here.
-const chosen = await page.evaluate(async () => {
+const chosen = await page.evaluate(async (accountList) => {
   const response = await fetch('/api/model-picker/models')
   const body = await response.json()
   const rows = body.models ?? body.rows ?? body
   // The floor that routes one model per account: its model ids NAME the
   // account (`trae-cn/deepseek-v4.1-flash`), so those are the routes that
   // carry a quota. A routing group is a pool of accounts and carries none.
-  const accounts = new Set(['trae-cn', 'workbuddy', 'zcode', 'qoder', 'cursor', 'grok', 'codex', 'cline', 'openrouter', 'zhipu'])
+  const accounts = new Set(accountList)
   const picked = []
   for (const row of rows) {
     if (row.provider !== 'magpie') continue
@@ -92,7 +92,7 @@ const chosen = await page.evaluate(async () => {
     if (!picked.includes(route)) picked.push(route)
   }
   return picked
-})
+}, ['trae-cn', 'workbuddy', 'zcode', 'qoder', 'cursor', 'grok', 'codex', 'cline', 'openrouter', 'zhipu'])
 console.log('routes        :', JSON.stringify(chosen))
 if (chosen.length < 4) throw new Error(`the directory offered only ${chosen.length} routes`)
 
@@ -126,24 +126,32 @@ await page.addInitScript((rows) => {
 
 // The gateway's snapshot is the one thing this shot must not leave to chance:
 // the code under test reads it from the host, and the host's answer is real.
-// A fallback row is only as good as that map, so the shot stubs the gateway's
-// answer to cover every supplier it queued (matched by provider id or name).
-// The host's quota route is real, but the host process predates the owner's
-// map (a plugin change needs a restart to reach the App's route table), so
-// the catalogue is added here — from the gateway itself, not from a fixture.
-// The row then wears the account the gateway says answers that model.
+//
+// The host process on this machine predates the owner's map and the balance
+// passthrough (a plugin change reaches the App's route table only after a
+// restart), so the shot answers the quota route with the NEW host half run
+// in-process against the real gateway. Both halves under test are therefore
+// the checkout's own files, and the only thing faked is the transport.
 const GATEWAY = process.env.MAGPIE_GATEWAY ?? 'http://127.0.0.1:3425'
+const host = await import('../lib/host.js')
+const routes = new Map()
+host.apply({
+  get: () => ({ listProviders: () => [], listModels: async () => [], resolveModel: async () => ({}) }),
+  webServer: { register: (route) => routes.set(route.path, route) },
+})
+const quotaBody = await new Promise((resolve) => {
+  let out = ''
+  routes.get('/api/model-picker/quotas').handler({ method: 'GET' }, {
+    setHeader() {},
+    set statusCode(_value) {},
+    end(body) { out = body },
+  })
+  setTimeout(() => resolve(out), 1_500)
+})
+const quotaPayload = JSON.parse(quotaBody)
+console.log('host snapshot : %s quota rows, %s owners', quotaPayload.quotas?.length, Object.keys(quotaPayload.owners ?? {}).length)
 await page.route((url) => url.href.includes('/api/model-picker/quotas'), async (route) => {
-  const response = await route.fetch()
-  const body = await response.json().catch(() => ({ ok: true, quotas: [] }))
-  const catalogue = await fetch(GATEWAY + '/v1/models').then((r) => r.json()).catch(() => ({ data: [] }))
-  const owners = {}
-  for (const entry of catalogue.data ?? []) {
-    if (typeof entry?.id !== 'string' || typeof entry?.owned_by !== 'string') continue
-    if (entry.id.startsWith('group/')) continue
-    owners[entry.id] = entry.owned_by
-  }
-  await route.fulfill({ response, body: JSON.stringify({ ...body, owners }) })
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(quotaPayload) })
 })
 
 await page.reload({ waitUntil: 'domcontentloaded' })
