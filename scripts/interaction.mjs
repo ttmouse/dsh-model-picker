@@ -1501,7 +1501,7 @@ const FALLBACK_ROUTE = 'zhipu/glm-4.6'
 const seedFallback = { 'dsh.modelPicker.fallback': JSON.stringify({ route: FALLBACK_ROUTE }) }
 
 /** Mount a fresh picker with storage seeded, and the session staged as given. */
-async function failoverMount(storage, stage) {
+async function failoverMount(storage, stage, groups) {
   dom.window.localStorage.clear()
   for (const [key, value] of Object.entries(storage)) dom.window.localStorage.setItem(key, value)
   sessionListeners.clear()
@@ -1511,6 +1511,9 @@ async function failoverMount(storage, stage) {
   repairCalls.released = 0
   // The fake directory is shared across mounts, so reset the current model or a
   // later case could click an already-selected row and never reach the action.
+  // The published directory is shared too: a case that added a floor hands the
+  // configured list back, and gets it for its own mount only.
+  snapshot.groups = groups ?? GROUPS
   snapshot.current = { provider: 'deepseek', model: 'deepseek-reasoner', reasoningEffort: 'high' }
   repairState.reachable = true
   repairState.promptResult = { ok: true, value: { accepted: true } }
@@ -2059,6 +2062,33 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
       throw new Error('a balance has no percentage to speak of')
     }
     await act(async () => { balance.root.unmount() })
+
+    // A routing floor: the gateway knows the account as `zcode`, and the
+    // configured supplier is `magpie/zcode`. The row must find that account
+    // through the vendor in the account id — not through the floor's name,
+    // which serves forty suppliers and would hand the first one's number to
+    // all of them.
+    QUOTAS.quotas.splice(0, QUOTAS.quotas.length,
+      { provider: 'zcode', name: 'ZCode', windows: [{ name: 'Weekly', remaining: 38, hoursLeft: 44 }] })
+    plugin.__resetQuotas()
+    const floorGroups = [...GROUPS, { id: 'magpie/zcode', name: 'Magpie', models: [
+      { id: 'glm-5', name: 'GLM 5 · ZCode 通道', description: 'routed through zcode' },
+    ] }]
+    const floor = await failoverMount({
+      'dsh.modelPicker.fallback': JSON.stringify(['magpie/zcode/glm-5']),
+    }, CLEAN, floorGroups)
+    await flushProbe()
+    await openFallbackPage(floor.host)
+    await flushProbe()
+    const floorLine = floor.host.querySelector('.dsh-mp2-fallbackItem .dsh-mp2-fallbackQuota')
+    console.log('floor quota   :', JSON.stringify(floorLine?.textContent ?? null), '| tooltip:', JSON.stringify(floorLine?.getAttribute('title') ?? null))
+    if (floorLine === null || floorLine.textContent !== '38% · 2d') {
+      throw new Error(`a floor must borrow the account it routes through, got ${JSON.stringify(floorLine?.textContent ?? null)}`)
+    }
+    if (!(floorLine.getAttribute('title') ?? '').startsWith('ZCode')) {
+      throw new Error('the floor\'s tooltip must name the account it borrowed')
+    }
+    await act(async () => { floor.root.unmount() })
 
     // No gateway, no quota row: the line is absent, not a zero or an error.
     QUOTAS.quotas.length = 0
