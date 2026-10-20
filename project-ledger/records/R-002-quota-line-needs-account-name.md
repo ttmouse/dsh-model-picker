@@ -1,17 +1,20 @@
 # R-002：兜底队列的额度行只能显示，前提是 floor 的账号名能对上供应商
 
+> **已由 R-003 取代（2026-10-20）**：本记录的前提——「路径首段就是账号」——不成立。首段可能是实验室（`commandcode/zhipu/…`）或厂商（`our-free-model/openrouter/…`），按它匹配会显示别人的数字。账号归属改由网关目录的 `owned_by` 决定，见 R-003。本记录留作当时判断的痕迹。
+
 ```json
 {
   "id": "R-002",
   "kind": "risk",
-  "status": "active",
+  "status": "superseded",
+  "superseded_by": "R-003",
   "summary": "兜底行的额度行靠 provider.id 里的账号段（magpie/zcode → zcode）去匹配 magpie 的额度行；配置里只写了 floor 名（magpie/<模型>）、没带供应商账号段时对不上，该行不出额度——不显示而不是显示错的",
   "scope": ["lib/client.js"],
   "sources": ["lib/client.js", "scripts/interaction.mjs"],
   "key": "quota-line-account-match",
   "supersedes": [],
   "retracts": [],
-  "relations": [{"type": "refines", "target": "D-001"}],
+  "relations": [{"type": "refines", "target": "D-001"}, {"type": "superseded-by", "target": "R-003"}],
   "recorded_at": "2026-10-20"
 }
 ```
