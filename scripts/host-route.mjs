@@ -331,6 +331,11 @@ if (strandedTest.status !== 200 || strandedTest.json.ok !== true) throw new Erro
   // the whole answer the row can speak. The host must carry it through
   // verbatim — currency included — instead of dropping it and leaving the row
   // blank, and it must not invent one for a windowed account.
+  //
+  // The owner's map rides along: the gateway's catalogue says which account
+  // answers which model, and the browser cannot know that by itself. A
+  // routing group is a POOL of accounts, so it is left out — one member's
+  // figure would not speak for the rest.
   {
     const realFetch = globalThis.fetch
     const gateway = {
@@ -341,7 +346,17 @@ if (strandedTest.status !== 200 || strandedTest.json.ok !== true) throw new Erro
         ] },
       ],
     }
-    globalThis.fetch = async () => ({ ok: true, json: async () => gateway })
+    const catalogue = {
+      data: [
+        { id: 'cline/cline-free/mimo-v2.6-flash', owned_by: 'cline' },
+        { id: 'qoder/dfmodel', owned_by: 'qoder' },
+        { id: 'group/auto-deepseek-v4-1-flash', owned_by: '17an-db' },
+        { id: 'no-owner-model' },
+      ],
+    }
+    globalThis.fetch = async (url) => (String(url).includes('/v1/models')
+      ? { ok: true, json: async () => catalogue }
+      : { ok: true, json: async () => gateway })
     try {
       // The cache is per process and holds the previous (unreachable) answer
       // for five minutes, so this rows are read through a fresh module
@@ -349,14 +364,26 @@ if (strandedTest.status !== 200 || strandedTest.json.ok !== true) throw new Erro
       const fresh = await import(join(root, 'lib/host.js?balance-probe'))
       const routes = new Map()
       fresh.apply({ get: () => llm, webServer: { register: (route) => routes.set(route.path, route) } })
-      const rows = (await call(routes.get('/api/model-picker/quotas'), get)).json.quotas
+      const body = (await call(routes.get('/api/model-picker/quotas'), get)).json
+      const rows = body.quotas
       const cline = rows.find((row) => row.provider === 'cline')
       const qoder = rows.find((row) => row.provider === 'qoder')
       console.log('balance row: %s | window row: %s', JSON.stringify(cline), JSON.stringify(qoder))
+      console.log('owners    : %s', JSON.stringify(body.owners))
       if (cline?.balance !== '$0.0096') throw new Error(`a balance-only account must carry its figure, got ${JSON.stringify(cline)}`)
       if (cline.windows?.length !== 0) throw new Error('a balance-only account has no windows to invent')
       if (qoder?.balance !== undefined) throw new Error('a windowed account must not gain a balance it never had')
       if (qoder?.windows?.[0]?.remaining !== 83) throw new Error('window remainders must still round through')
+      if (body.owners?.['cline/cline-free/mimo-v2.6-flash'] !== 'cline') {
+        throw new Error(`the catalogue must say which account answers a model, got ${JSON.stringify(body.owners)}`)
+      }
+      if (body.owners?.['qoder/dfmodel'] !== 'qoder') throw new Error('every account-scoped model must name its account')
+      if ('group/auto-deepseek-v4-1-flash' in (body.owners ?? {})) {
+        throw new Error('a routing group is a pool of accounts and must name none of them')
+      }
+      if ('no-owner-model' in (body.owners ?? {})) {
+        throw new Error('a model the catalogue does not attribute must name no account')
+      }
     } finally {
       globalThis.fetch = realFetch
     }

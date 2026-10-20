@@ -74,20 +74,21 @@ const chosen = await page.evaluate(async () => {
   const response = await fetch('/api/model-picker/models')
   const body = await response.json()
   const rows = body.models ?? body.rows ?? body
-  const wanted = ['zcode', 'workbuddy', 'qoder', 'cline', 'opencode-go', 'trae-cn', 'our-free-model', 'openrouter', 'codex', 'cursor', 'grok']
-  const first = new Map()
-  for (const row of rows) if (!first.has(row.provider)) first.set(row.provider, row.provider + '/' + row.id)
+  // The floor that routes one model per account: its model ids NAME the
+  // account (`trae-cn/deepseek-v4.1-flash`), so those are the routes that
+  // carry a quota. A routing group is a pool of accounts and carries none.
+  const accounts = new Set(['trae-cn', 'workbuddy', 'zcode', 'qoder', 'cursor', 'grok', 'codex', 'cline', 'openrouter', 'zhipu'])
   const picked = []
-  for (const name of wanted) {
-    for (const [provider, route] of first) {
-      if (!provider.includes(name)) continue
-      picked.push(route)
-      break
-    }
+  for (const row of rows) {
+    if (row.provider !== 'magpie') continue
+    const head = row.id.includes('/') ? row.id.slice(0, row.id.indexOf('/')) : ''
+    if (!accounts.has(head)) continue
+    picked.push('magpie/' + row.id)
     if (picked.length === 4) break
   }
-  for (const route of first.values()) {
+  for (const row of rows) {
     if (picked.length === 4) break
+    const route = row.provider + '/' + row.id
     if (!picked.includes(route)) picked.push(route)
   }
   return picked
@@ -127,25 +128,22 @@ await page.addInitScript((rows) => {
 // the code under test reads it from the host, and the host's answer is real.
 // A fallback row is only as good as that map, so the shot stubs the gateway's
 // answer to cover every supplier it queued (matched by provider id or name).
+// The host's quota route is real, but the host process predates the owner's
+// map (a plugin change needs a restart to reach the App's route table), so
+// the catalogue is added here — from the gateway itself, not from a fixture.
+// The row then wears the account the gateway says answers that model.
+const GATEWAY = process.env.MAGPIE_GATEWAY ?? 'http://127.0.0.1:3425'
 await page.route((url) => url.href.includes('/api/model-picker/quotas'), async (route) => {
   const response = await route.fetch()
   const body = await response.json().catch(() => ({ ok: true, quotas: [] }))
-  const rows = body.quotas ?? []
-  const wanted = {
-    qoder: { name: 'Qoder', balance: undefined, windows: [{ name: 'Add-on credits', remaining: 83 }] },
+  const catalogue = await fetch(GATEWAY + '/v1/models').then((r) => r.json()).catch(() => ({ data: [] }))
+  const owners = {}
+  for (const entry of catalogue.data ?? []) {
+    if (typeof entry?.id !== 'string' || typeof entry?.owned_by !== 'string') continue
+    if (entry.id.startsWith('group/')) continue
+    owners[entry.id] = entry.owned_by
   }
-  const suppliers = ROWS.map(([route]) => route.split('/')[0])
-  for (const id of suppliers) {
-    if (rows.some((row) => row.provider === id)) continue
-    rows.push({ provider: id, name: id, windows: [{ name: 'Weekly', remaining: 62, hoursLeft: 26, projectedWaste: 58 }] })
-  }
-  const clineRow = rows.find((row) => row.provider === 'cline' && (row.windows ?? []).length === 0)
-  if (clineRow !== undefined) {
-    clineRow.windows = []
-    clineRow.balance = '$0.0096'
-  }
-  void wanted
-  await route.fulfill({ response, body: JSON.stringify({ ...body, quotas: rows }) })
+  await route.fulfill({ response, body: JSON.stringify({ ...body, owners }) })
 })
 
 await page.reload({ waitUntil: 'domcontentloaded' })

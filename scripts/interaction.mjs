@@ -1991,6 +1991,8 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
 //         figure rather than a percent of an unknown ceiling.
 {
   const realFetch = globalThis.fetch
+  // The quota rows, plus the owner's map: the gateway's catalogue saying which
+  // account answers which model. The two together turn a route into a number.
   const QUOTAS = { ok: true, quotas: [
     { provider: '17an', name: '一起安 渠道', windows: [
       { name: '5 hours', remaining: 84, hoursLeft: 2 },
@@ -2002,7 +2004,12 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     // The model list's own supplier column, so the base list is not left bare.
     { provider: 'deepseek', name: 'DeepSeek', windows: [{ name: 'Weekly', remaining: 77, hoursLeft: 100 }] },
     { provider: 'modlens-deepseek', name: 'DeepSeek (modlens vision)', windows: [{ name: 'Weekly', remaining: 77, hoursLeft: 100 }] },
-  ] }
+  ], owners: {
+    '17an/qwen3-max': '17an',
+    'zhipu/glm-4.6': 'zhipu',
+    'deepseek/deepseek-reasoner': 'deepseek',
+    'modlens-deepseek/deepseek-reasoner': 'modlens-deepseek',
+  } }
   // The quota snapshot is read once per page load and every mount in this file
   // shares that one read. By the time this case runs, the page's own picker has
   // long been mounted and that read has settled, so a stub that answers now is
@@ -2063,30 +2070,62 @@ const ledgerOf = () => JSON.parse(dom.window.localStorage.getItem('dsh.modelPick
     }
     await act(async () => { balance.root.unmount() })
 
-    // A routing floor: the gateway knows the account as `zcode`, and the
-    // configured supplier is `magpie/zcode`. The row must find that account
-    // through the vendor in the account id — not through the floor's name,
-    // which serves forty suppliers and would hand the first one's number to
-    // all of them.
+    // A floor that routes one model per account: the account is named in the
+    // MODEL's own path (`magpie/trae-cn/deepseek-v4.1-flash` runs on the Trae
+    // CN account), not in the floor's name. The row must read the account out
+    // of the route and borrow that account's number.
     QUOTAS.quotas.splice(0, QUOTAS.quotas.length,
-      { provider: 'zcode', name: 'ZCode', windows: [{ name: 'Weekly', remaining: 38, hoursLeft: 44 }] })
+      { provider: 'trae-cn', name: 'Trae CN', windows: [{ name: 'Credits', remaining: 69, hoursLeft: 280 }] },
+      { provider: 'workbuddy', name: 'WorkBuddy', windows: [{ name: 'Credits', remaining: 16, hoursLeft: 999 }] },
+      { provider: 'zhipu', name: '智谱 GLM', windows: [{ name: 'Monthly', remaining: 12, hoursLeft: 100 }] })
+    QUOTAS.owners = {
+      'trae-cn/deepseek-v4.1-flash': 'trae-cn',
+      'workbuddy/deepseek-v4.1-flash': 'workbuddy',
+    }
     plugin.__resetQuotas()
-    const floorGroups = [...GROUPS, { id: 'magpie/zcode', name: 'Magpie', models: [
-      { id: 'glm-5', name: 'GLM 5 · ZCode 通道', description: 'routed through zcode' },
+    const floorGroups = [...GROUPS, { id: 'magpie', name: 'Magpie', models: [
+      { id: 'trae-cn/deepseek-v4.1-flash', name: 'DeepSeek-V4.1-Flash · Trae CN', description: 'account-scoped' },
+      { id: 'workbuddy/deepseek-v4.1-flash', name: 'Deepseek-V4.1-Flash · WorkBuddy', description: 'account-scoped' },
+      { id: 'group/auto-deepseek-v4-1-flash', name: 'DeepSeek V4.1 Flash · routing group', description: 'a pool of accounts' },
+    ] }, { id: 'commandcode', name: 'commandcode', models: [
+      { id: 'zhipu/glm-4.6', name: 'GLM-4.6 · 智谱 GLM', description: 'a vendor model whose path names another lab' },
     ] }]
     const floor = await failoverMount({
-      'dsh.modelPicker.fallback': JSON.stringify(['magpie/zcode/glm-5']),
+      'dsh.modelPicker.fallback': JSON.stringify([
+        'magpie/trae-cn/deepseek-v4.1-flash',
+        'magpie/workbuddy/deepseek-v4.1-flash',
+        'magpie/group/auto-deepseek-v4-1-flash',
+        'commandcode/zhipu/glm-4.6',
+      ]),
     }, CLEAN, floorGroups)
     await flushProbe()
     await openFallbackPage(floor.host)
     await flushProbe()
-    const floorLine = floor.host.querySelector('.dsh-mp2-fallbackItem .dsh-mp2-fallbackQuota')
-    console.log('floor quota   :', JSON.stringify(floorLine?.textContent ?? null), '| tooltip:', JSON.stringify(floorLine?.getAttribute('title') ?? null))
-    if (floorLine === null || floorLine.textContent !== '38% · 2d') {
-      throw new Error(`a floor must borrow the account it routes through, got ${JSON.stringify(floorLine?.textContent ?? null)}`)
+    const floorLines = [...floor.host.querySelectorAll('.dsh-mp2-fallbackItem')].map((row) => {
+      const el = row.querySelector('.dsh-mp2-fallbackQuota')
+      return el === null ? null : { text: el.textContent, title: el.getAttribute('title') }
+    })
+    console.log('floor lines   : %s', JSON.stringify(floorLines))
+    if (floorLines[0]?.text !== '69% · 12d') {
+      throw new Error(`an account-scoped route must wear its own account's number, got ${JSON.stringify(floorLines[0]?.text ?? null)}`)
     }
-    if (!(floorLine.getAttribute('title') ?? '').startsWith('ZCode')) {
-      throw new Error('the floor\'s tooltip must name the account it borrowed')
+    if (!(floorLines[0]?.title ?? '').startsWith('Trae CN')) {
+      throw new Error('the tooltip must name the account the number belongs to')
+    }
+    if (floorLines[1]?.text !== '16% · 42d') {
+      throw new Error(`a second account must wear its own number, got ${JSON.stringify(floorLines[1]?.text ?? null)}`)
+    }
+    // A routing group is a POOL of accounts, so it wears no single number:
+    // showing one member's figure would be a lie about the others.
+    if (floorLines[2] !== null) {
+      throw new Error(`a routing group must not wear one account's number, got ${JSON.stringify(floorLines[2])}`)
+    }
+    // A vendor's own model whose path names a LAB (`zhipu/glm-4.6`) is not that
+    // lab's subscription: the route is the commandcode reseller's, and its
+    // account is one the gateway never named. Reading the first path segment
+    // as an account would hand this row the Zhipu account's figure.
+    if (floorLines[3] !== null) {
+      throw new Error(`a reseller's model must not borrow the lab account's number, got ${JSON.stringify(floorLines[3])}`)
     }
     await act(async () => { floor.root.unmount() })
 
